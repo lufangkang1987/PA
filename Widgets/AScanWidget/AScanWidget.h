@@ -3,7 +3,17 @@
 #include <QVector>
 #include <QElapsedTimer>
 
-/// @brief A 扫描视图 — 横轴=螺栓长度(mm)，纵轴=回波幅度(%)
+/// @brief 闸门参数
+struct GateDef
+{
+    bool  enabled   = false;   // 是否启用
+    float start     = 0.0f;    // 起位 (mm)
+    float width     = 5.0f;    // 宽度 (mm)
+    float threshold = 30.0f;   // 阈值 (%)
+    QColor color = Qt::red;    // 显示颜色
+};
+
+/// @brief A 扫描视图 — 横轴=深度(mm)，纵轴=回波幅度(%)
 ///
 /// 通过 setAcousticParams(velocity, sampleRate) 实现
 /// 采样点序号 → 长度(mm) 的标尺换算：
@@ -30,23 +40,64 @@ public slots:
     void setWaveform(const QVector<double> &data,
                      int beamIndex, int frameIndex, int rectifyMode);
 
+    /// 冻结控制：frozen=true 时不更新波形，但保留最后一帧画面
+    void setLive(bool live);
+
+    /// 设置单个闸门参数
+    /// @param gate 闸门编号: 0=A, 1=B, 2=C
+    void setGate(int gate, bool enabled, float start, float width,
+                 float threshold, const QColor &color);
+
+    /// 显示/隐藏所有闸门
+    void setGatesVisible(bool visible);
+
+    /// 设置当前拖拽闸门 (0=A, 1=B, 2=C)
+    void setActiveGate(int gate) { m_activeGate = gate; }
+    int  activeGate() const       { return m_activeGate; }
+
+    /// 报警状态
+    void setAlarm(bool on) { m_alarm = on; update(); }
+
+    /// 回放模式：用指定参数代替实时参数
+    void setReplayMode(bool on, float range, const GateDef gates[3]);
+
+signals:
+    /// 闸门拖拽完成 (gate, start_mm, threshold_pct)
+    void gateDragged(int gate, float start, float threshold);
+    /// 点击A扫区域切换声束 (beamIndex)
+    void beamChangeRequested(int beamIndex);
+
 protected:
     void paintEvent(QPaintEvent *) override;
+    void mousePressEvent(QMouseEvent *) override;
+    void mouseMoveEvent(QMouseEvent *) override;
+    void mouseReleaseEvent(QMouseEvent *) override;
 
 private:
+    QRectF plotRect() const;        // 绘图区矩形
+    double totalRangeMm() const;    // 总声程 mm
     // ── 波形数据 ──
     QVector<double> m_data;
     int  m_beamIndex   = 0;
     int  m_frameIndex  = 0;
-    int  m_rectifyMode = 3;          // 默认 RF
-    bool m_isLive      = false;
+    int  m_rectifyMode = 0;          // 默认全波检波，幅度范围 0~100%
+    bool m_isLive      = false;      // 收到过真实数据（区分 mock vs real）
+    bool m_frozen      = false;      // 冻结模式：不接收新波形
 
     // ── 声学参数（横轴标尺） ──
     float m_velocity   = 5920.0f;    // m/s
     int   m_sampleRate = 100;        // MHz
     float m_userRange  = 0.0f;       // mm, 0=自动
 
-    // ── FPS 统计 ──
+    // ── 闸门 ──
+    GateDef m_gates[3];              // 0=A, 1=B, 2=C
+    bool    m_gatesVisible = true;
+    int     m_activeGate = 0;        // 当前拖拽闸门
+    bool    m_dragging   = false;    // 正在拖拽中
+    bool    m_alarm      = false;    // 报警状态
+    bool    m_replay     = false;    // 回放模式
+    float   m_replayRange= 0.0f;
+    GateDef m_replayGates[3];        // 回放用的闸门参数
     QElapsedTimer m_fpsTimer;
     int  m_frameCount   = 0;
     float m_currentFps  = 0.0f;

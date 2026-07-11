@@ -105,63 +105,42 @@ public:
 
     // ========== 参数命令（对应 MFC 版 SendCommand） ==========
 
-    /// 设置扫查类型：0=S扫, 1=L扫, 2=CL扫, 3=TFM
-    void setScanType(int type);
-
-    /// 设置模拟增益(dB)
-    void setAnalogGain(float dB);
-
-    /// 设置数字增益(dB)
-    void setDigitalGain(float dB);
-
-    /// 设置高压：0=110V, 1=40V, 2=20V
-    void setHighVoltage(int level);
-
-    /// 设置脉冲宽度(ns)
-    void setPulseWidth(int width);
-
-    /// 设置重复频率(Hz)
-    void setPRF(int prf);
-
-    /// 设置检测范围(mm)
-    void setRange(float range);
-
-    /// 设置检波方式：0=全波, 1=正半波, 2=负半波, 3=射频
-    void setRectify(int mode);
-
-    /// 设置滤波器档位
-    void setFilter(int filter);
-
-    /// 设置 A 波数据长度：0=128, 1=256, 2=512
-    void setADataLen(int len);
-
-    /// 设置 A 扫平滑
-    void setASmooth(bool enable);
-
-    /// 设置视频检波
-    void setVideoDetect(bool enable);
-
-    /// 设置闸门参数 (gate: 'A'/'B'/'C')
+    void setScanType(int type) override;
+    void setAnalogGain(float dB) override;
+    void setDigitalGain(float dB) override;
+    void setHighVoltage(int level) override;
+    void setPulseWidth(int width) override;
+    void setPRF(int prf) override;
+    void setRange(float range) override;
+    void setRectify(int mode) override;
+    void setFilter(int filter) override;
+    void setADataLen(int len) override;
+    void setASmooth(bool enable) override;
+    void setVideoDetect(bool enable) override;
     void setGate(char gate, float start, float width, float threshold,
-                 const QString &measureType = "peak");
+                 const QString &measureType = QStringLiteral("peak")) override;
+    void setBeamDelay() override;
+    void setCommonRDelay() override;
+    void setTFMImageProcess(double subtract, double supress, double smooth) override;
+    void resetEncoder(int idx) override;
 
-    /// 设置声束延迟校正
-    void setBeamDelay();
+    // -------- 扫查配置 setter（供"应用法则"批量下发）--------
+    void setVelocity(float mps) override;
+    void setProbeGeometry(int count, float freqMHz, float pitchMm) override;
+    void setElementGeometry(int start, int end, int aperture) override;
+    void setSscanAngles(float fromDeg, float toDeg) override;
+    void setLscanAngle(float angleDeg) override;
+    void setFocusMm(float mm) override;
+    void setWedgeGeometry(bool enable, float angleDeg, int velocityMps, float heightMm) override;
 
-    /// 设置接收延迟(TFM模式)
-    void setCommonRDelay();
-
-    /// 设置 TFM 图像处理参数
-    void setTFMImageProcess(double subtract, double supress, double smooth);
+    /// 远程关机
+    void powerOff() override;
 
     /// 获取仪器温度
     void queryTemperature();
 
     /// 获取仪器电压
     void queryVoltage();
-
-    /// 编码器复位（idx: 0=正向, 1=反向）
-    void resetEncoder(int idx);
 
 signals:
     // -------- 连接状态 --------
@@ -238,7 +217,7 @@ private:
     int   m_pulseWidth   = 100;
     int   m_prf          = 2000;
     float m_range        = 100.0f;
-    int   m_rectify      = 3;     // 全波
+    int   m_rectify      = 0;     // 全波
     int   m_filter       = 0;
     int   m_aDataLen     = 0;     // 400点
 

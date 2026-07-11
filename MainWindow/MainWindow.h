@@ -1,12 +1,12 @@
 #pragma once
 #include <QMainWindow>
 
-class QTabWidget;
 class QComboBox;
 class QLabel;
 class QPushButton;
 class HomePage;
 class ParamPage;
+class MeasurePage;
 class IDriver;
 
 class MainWindow : public QMainWindow
@@ -23,9 +23,9 @@ private:
     void setupUi();
     void wireDriverSignals();
 
-    QTabWidget   *m_tabs = nullptr;
     HomePage     *m_homePage = nullptr;
     ParamPage    *m_paramPage = nullptr;
+    MeasurePage  *m_measurePage = nullptr;
     IDriver      *m_driver = nullptr;
 
     // 连接模式 UI

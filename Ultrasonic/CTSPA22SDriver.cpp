@@ -505,14 +505,19 @@ QJsonObject CTSPA22SDriver::buildScanTypeCommand(int type)
     }
     case 1: {  // L-Scan
         QJsonObject lscan;
-        lscan["probe_count"]  = m_probeCount;
-        lscan["probe_freq"]   = m_probeFreq;
-        lscan["probe_pitch"]  = m_probePitch;
-        lscan["ele_start"]    = m_eleStart;
-        lscan["ele_end"]      = m_eleEnd;
-        lscan["ele_aperture"] = m_eleAperture;
-        lscan["focus"]        = m_focus;
-        lscan["velocity"]     = m_velocity;
+        lscan["probe_count"]    = m_probeCount;
+        lscan["probe_freq"]     = m_probeFreq;
+        lscan["probe_pitch"]    = m_probePitch;
+        lscan["ele_start"]      = m_eleStart;
+        lscan["ele_end"]        = m_eleEnd;
+        lscan["ele_aperture"]   = m_eleAperture;
+        lscan["angle"]          = m_angleFrom;
+        lscan["focus"]          = m_focus;
+        lscan["velocity"]       = m_velocity;
+        lscan["wedge_enable"]   = m_wedgeEnable ? 1 : 0;
+        lscan["wedge_angle"]    = m_wedgeAngle;
+        lscan["wedge_velocity"] = m_wedgeVelocity;
+        lscan["wedge_height"]   = m_wedgeHeight;
         cmd["pa_lscan"] = lscan;
         break;
     }
@@ -791,4 +796,62 @@ void CTSPA22SDriver::resetEncoder(int idx)
     QJsonObject obj;
     obj["encoder_reset"] = enc;
     sendJsonCommand(obj);
+}
+
+// ================================================================
+// 扫查配置 setter（仅更新内部状态，不单独下发命令；由 setScanType 统一构造 JSON）
+// ================================================================
+
+void CTSPA22SDriver::setVelocity(float mps)
+{
+    m_velocity = mps;
+}
+
+void CTSPA22SDriver::setProbeGeometry(int count, float freqMHz, float pitchMm)
+{
+    m_probeCount = count;
+    m_probeFreq  = freqMHz;
+    m_probePitch = pitchMm;
+}
+
+void CTSPA22SDriver::setElementGeometry(int start, int end, int aperture)
+{
+    m_eleStart    = start;
+    m_eleEnd      = end;
+    m_eleAperture = aperture;
+}
+
+void CTSPA22SDriver::setSscanAngles(float fromDeg, float toDeg)
+{
+    m_angleFrom = fromDeg;
+    m_angleTo   = toDeg;
+}
+
+void CTSPA22SDriver::setLscanAngle(float angleDeg)
+{
+    // L扫只使用单一角度；angle 也存于 m_angleFrom 供 buildScanTypeCommand 读取
+    m_angleFrom = angleDeg;
+}
+
+void CTSPA22SDriver::setFocusMm(float mm)
+{
+    m_focus = mm;
+}
+
+void CTSPA22SDriver::setWedgeGeometry(bool enable, float angleDeg, int velocityMps, float heightMm)
+{
+    m_wedgeEnable   = enable;
+    m_wedgeAngle    = angleDeg;
+    m_wedgeVelocity = velocityMps;
+    m_wedgeHeight   = heightMm;
+}
+
+void CTSPA22SDriver::powerOff()
+{
+    // 对应 MFC 版: {"power": "off"}\x1E
+    // 硬件还支持 "on" 和 "stayby"，这里只实现关机
+    QJsonObject obj;
+    obj["power"] = QString("off");
+    sendJsonCommand(obj, false);  // 不等待响应，硬件可能直接断电
+    emit statusChanged("已发送远程关机指令");
 }

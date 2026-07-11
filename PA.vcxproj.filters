@@ -52,6 +52,12 @@
     <ClCompile Include="Pages\ParamPage\ParamPage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Pages\CScanPage\CScanPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="MainWindow\MainWindow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -78,6 +84,12 @@
     <QtMoc Include="Pages\ParamPage\ParamPage.h">
       <Filter>Header Files</Filter>
     </QtMoc>
+    <QtMoc Include="Pages\CScanPage\CScanPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\MeasurePage\MeasurePage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
     <QtMoc Include="MainWindow\MainWindow.h">
       <Filter>Header Files</Filter>
     </QtMoc>
@@ -87,6 +99,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Ultrasonic\DataTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Ultrasonic\PAParams.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui_HomePage.h">

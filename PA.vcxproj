@@ -69,7 +69,7 @@
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)MainWindow;$(ProjectDir)Pages\HomePage;$(ProjectDir)Pages\ParamPage;$(ProjectDir)Ultrasonic;$(ProjectDir)Widgets\AScanWidget;$(ProjectDir)Widgets\BScanWidget;$(ProjectDir)Widgets\CScanWidget;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)MainWindow;$(ProjectDir)Pages\HomePage;$(ProjectDir)Pages\ParamPage;$(ProjectDir)Pages\CScanPage;$(ProjectDir)Pages\MeasurePage;$(ProjectDir)Ultrasonic;$(ProjectDir)Widgets\AScanWidget;$(ProjectDir)Widgets\BScanWidget;$(ProjectDir)Widgets\CScanWidget;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -85,7 +85,7 @@
       <ConformanceMode>true</ConformanceMode>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)MainWindow;$(ProjectDir)Pages\HomePage;$(ProjectDir)Pages\ParamPage;$(ProjectDir)Ultrasonic;$(ProjectDir)Widgets\AScanWidget;$(ProjectDir)Widgets\BScanWidget;$(ProjectDir)Widgets\CScanWidget;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)MainWindow;$(ProjectDir)Pages\HomePage;$(ProjectDir)Pages\ParamPage;$(ProjectDir)Pages\CScanPage;$(ProjectDir)Pages\MeasurePage;$(ProjectDir)Ultrasonic;$(ProjectDir)Widgets\AScanWidget;$(ProjectDir)Widgets\BScanWidget;$(ProjectDir)Widgets\CScanWidget;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -99,6 +99,8 @@
     <ClCompile Include="MainWindow\MainWindow.cpp" />
     <ClCompile Include="Pages\HomePage\HomePage.cpp" />
     <ClCompile Include="Pages\ParamPage\ParamPage.cpp" />
+    <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp" />
+    <ClCompile Include="Pages\CScanPage\CScanPage.cpp" />
     <ClCompile Include="Ultrasonic\AppState.cpp" />
     <ClCompile Include="Ultrasonic\CTSPA22SDriver.cpp" />
     <ClCompile Include="Widgets\AScanWidget\AScanWidget.cpp" />
@@ -125,12 +127,15 @@
   <ItemGroup>
     <QtMoc Include="MainWindow\MainWindow.h" />
     <QtMoc Include="Pages\ParamPage\ParamPage.h" />
+    <QtMoc Include="Pages\MeasurePage\MeasurePage.h" />
+    <QtMoc Include="Pages\CScanPage\CScanPage.h" />
     <QtMoc Include="Pages\HomePage\HomePage.h" />
     <ClInclude Include="ui_HomePage.h" />
     <ClInclude Include="ui_MainWindow.h" />
     <ClInclude Include="ui_ParamPage.h" />
     <ClInclude Include="Ultrasonic\DataTypes.h" />
     <ClInclude Include="Ultrasonic\IDriver.h" />
+    <ClInclude Include="Ultrasonic\PAParams.h" />
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="MainWindow\MainWindow.ui" />

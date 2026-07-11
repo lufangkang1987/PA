@@ -1,20 +1,16 @@
 #include "AScanWidget.h"
 #include <QPainter>
 #include <QPainterPath>
+#include <QMouseEvent>
 #include <QtMath>
 
 AScanWidget::AScanWidget(QWidget *parent) : QWidget(parent)
 {
-    setMinimumHeight(260);
-    // 初始 mock 数据（RF 模式，双极性，400 点）
+    setMinimumHeight(220);
+    setMinimumWidth(280);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    // 不填充 mock 数据：无真实波形时绘图区仅显示网格和坐标轴
     m_data.resize(kMaxSamples);
-    for (int i = 0; i < m_data.size(); ++i) {
-        const double echo1 = qExp(-qPow((i - 30)  / 16.0, 2.0)) * qSin(i * 0.8)  * 0.85;
-        const double echo2 = qExp(-qPow((i - 180) / 10.0, 2.0)) * qSin(i * 0.95) * 0.6;
-        const double echo3 = qExp(-qPow((i - 260) / 8.0,  2.0)) * qSin(i * 1.1)  * 0.35;
-        const double noise  = qSin(i * 0.23) * 0.02;
-        m_data[i] = echo1 + echo2 + echo3 + noise;
-    }
     m_fpsTimer.start();
 }
 
@@ -28,13 +24,19 @@ void AScanWidget::setAcousticParams(float velocity, int sampleRate, float range)
 void AScanWidget::setWaveform(const QVector<double> &data,
                                int beamIndex, int frameIndex, int rectifyMode)
 {
-    m_data        = data;
+    if (m_frozen)
+        return;
+
+    // 波形限幅 (同MFC: if waveP[i] > 250 → 250)
+    m_data = data;
+    for (auto &v : m_data)
+        v = qBound(0.0, v, 1.0);
+
     m_beamIndex   = beamIndex;
     m_frameIndex  = frameIndex;
     m_rectifyMode = rectifyMode;
     m_isLive      = true;
 
-    // FPS 统计
     ++m_frameCount;
     if (m_fpsTimer.elapsed() >= 1000) {
         m_currentFps = m_frameCount * 1000.0 / m_fpsTimer.elapsed();
@@ -45,163 +47,293 @@ void AScanWidget::setWaveform(const QVector<double> &data,
     update();
 }
 
-// ─── 辅助：采样点 → 长度(mm) ───
-// 公式: depth = index × velocity(m/s) / (2 × sampleRate(Hz)) × 1000
-static double sampleToMm(int i, int total, float velocity, int sampleRateMHz, float userRange)
+void AScanWidget::setLive(bool live)
 {
-    if (userRange > 0.0f) {
-        // 用户指定声程：按比例等距映射
-        return userRange * double(i) / double(total - 1);
-    }
-    // 自动：根据声速和采样率计算真实物理长度
-    const double sampleRateHz = sampleRateMHz * 1e6;
-    return double(i) * velocity / (2.0 * sampleRateHz) * 1000.0;
+    m_frozen = !live;
+    update();
 }
 
-static double totalRangeMm(int total, float velocity, int sampleRateMHz, float userRange)
+void AScanWidget::setGate(int gate, bool enabled, float start, float width,
+                           float threshold, const QColor &color)
 {
-    if (userRange > 0.0f)
-        return userRange;
-    return sampleToMm(total - 1, total, velocity, sampleRateMHz, userRange);
+    if (gate < 0 || gate > 2) return;
+    m_gates[gate].enabled   = enabled;
+    m_gates[gate].start     = start;
+    m_gates[gate].width     = width;
+    m_gates[gate].threshold = threshold;
+    m_gates[gate].color     = color;
+    update();
 }
+
+void AScanWidget::setGatesVisible(bool visible)
+{
+    m_gatesVisible = visible;
+    update();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 辅助：绘图区 / 总声程
+// ═══════════════════════════════════════════════════════════
+
+QRectF AScanWidget::plotRect() const
+{
+    const int marginLeft  = 50;
+    const int marginRight = 10;
+    const int marginTop   = 8;
+    const int marginBot   = 36;
+    return QRectF(marginLeft, marginTop,
+                  qMax(40, width() - marginLeft - marginRight),
+                  qMax(30, height() - marginTop - marginBot));
+}
+
+double AScanWidget::totalRangeMm() const
+{
+    if (m_userRange > 0.0f)
+        return m_userRange;
+    const int N = qMax(1, m_data.size());
+    return double(N - 1) * m_velocity / (2.0 * m_sampleRate * 1e6) * 1000.0;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MFC 风格 A 扫绘制
+// 坐标系：X=幅度(0~100%)，Y=深度(从上到下，0~Range mm)
+// ═══════════════════════════════════════════════════════════
 
 void AScanWidget::paintEvent(QPaintEvent *)
 {
-    const bool isRF = (m_rectifyMode == 3 || m_rectifyMode < 0);
-    const int  N    = m_data.size();
-    const double totalMm = totalRangeMm(N, m_velocity, m_sampleRate, m_userRange);
+    const int N = m_data.size();
+    const double totalMm = totalRangeMm();
+    const QRectF plot = plotRect();
 
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
     p.fillRect(rect(), QColor(7, 17, 27));
 
-    // ── 绘图区 ──
-    const int marginLeft  = 54;
-    const int marginRight = 10;
-    const int marginTop   = 12;
-    const int marginBot   = 40;
-    const QRect plot(marginLeft, marginTop,
-                     width() - marginLeft - marginRight,
-                     height() - marginTop - marginBot);
-    p.fillRect(plot, QColor(6, 20, 32));
+    // 黑色背景
+    p.fillRect(plot, QColor(0, 0, 0));
 
-    // ── 网格 ──
-    p.setPen(QPen(QColor(30, 58, 82, 140), 1));
-    for (int i = 0; i <= 10; ++i) {
-        const int x = plot.left() + i * plot.width() / 10;
+    // ── 网格 (5竖线×8横线) ──
+    p.setPen(QPen(QColor(40, 40, 40), 1));
+    for (int i = 1; i < 5; ++i) {   // 竖线：幅度 25/50/75%
+        const int x = plot.left() + i * plot.width() / 5;
         p.drawLine(x, plot.top(), x, plot.bottom());
     }
-    const int midY = plot.center().y();
-    for (int i = 0; i <= 8; ++i) {
+    for (int i = 1; i < 8; ++i) {   // 横线：深度均匀
         const int y = plot.top() + i * plot.height() / 8;
         p.drawLine(plot.left(), y, plot.right(), y);
     }
-    if (isRF) {
-        p.setPen(QPen(QColor(50, 100, 140, 80), 1, Qt::DashLine));
-        p.drawLine(plot.left(), midY, plot.right(), midY);
-    }
 
-    // ── X 轴长度标尺 ──
-    p.setPen(QColor(180, 195, 210));
-    p.setFont(QFont("Microsoft YaHei", 9));
+    // ── X 轴标尺：幅度 % ──
     {
-        const int xTickCount = (totalMm < 20.0) ? 5 : 10;
-        const double xStep   = totalMm / xTickCount;
-        for (int i = 0; i <= xTickCount; ++i) {
-            const double mm = i * xStep;
-            const int x = plot.left() + int(double(i) / xTickCount * plot.width());
-            // 刻度线
-            p.drawLine(x, plot.bottom(), x, plot.bottom() + 4);
-            // 刻度数字
-            QString label;
-            if (totalMm < 5.0)
-                label = QString::number(mm, 'f', 2);
-            else if (totalMm < 100.0)
-                label = QString::number(mm, 'f', 1);
-            else
-                label = QString::number(int(mm + 0.5));
-            const int textW = p.fontMetrics().horizontalAdvance(label);
-            p.drawText(x - textW / 2, plot.bottom() + 16, label);
+        p.setPen(QColor(160, 185, 200));
+        QFont f("Microsoft YaHei", 9);
+        p.setFont(f);
+        const QFontMetrics fm(f);
+        for (int i = 0; i <= 5; ++i) {
+            const int pct = i * 20;
+            const double x = plot.left() + i * plot.width() / 5.0;
+            p.drawLine(QPointF(x, plot.bottom()), QPointF(x, plot.bottom() + 4));
+            const QString s = QString::number(pct);
+            p.drawText(qBound(plot.left(), x - fm.horizontalAdvance(s) / 2.0,
+                              plot.right() - 20.0), plot.bottom() + 16, s);
         }
-    }
-    // X 轴标签
-    p.setFont(QFont("Microsoft YaHei", 9));
-    p.drawText(plot.center().x() - 28, height() - 6,
-               QString::fromUtf8("\u957F\u5EA6(mm)"));   // "长度(mm)"
-
-    // ── Y 轴标尺 ──
-    p.setPen(QColor(180, 195, 210));
-    p.setFont(QFont("Microsoft YaHei", 9));
-    if (isRF) {
-        for (int i = 0; i <= 4; ++i) {
-            const int pct = 100 - i * 50;
-            const int y = plot.top() + i * plot.height() / 4;
-            p.drawText(4, y + 4, QString::number(pct));
-        }
-    } else {
-        for (int i = 0; i <= 4; ++i) {
-            const int pct = 100 - i * 25;
-            const int y = plot.top() + i * plot.height() / 4;
-            p.drawText(12, y + 4, QString::number(pct));
-        }
+        p.drawText(plot.right() - 16, plot.bottom() + 16, "%");
     }
 
-    // ── 波形绘制 ──
-    if (N >= 2) {
+    // ── Y 轴标尺：深度 mm ──
+    {
+        p.setPen(QColor(160, 185, 200));
+        QFont f("Microsoft YaHei", 9);
+        p.setFont(f);
+        const QFontMetrics fm(f);
+        const int ml = int(plot.left());
+        for (int i = 0; i <= 5; ++i) {
+            const double mm = totalMm * i / 5.0;
+            const double y = plot.top() + i * plot.height() / 5.0;
+            p.drawLine(QPointF(ml - 4, y), QPointF(ml, y));
+            const QString s = QString::number(mm, 'f', 1);
+            p.drawText(qMax(2.0, ml - 6.0 - fm.horizontalAdvance(s)),
+                       y + fm.ascent() / 2.0, s);
+        }
+        const QString u = "mm";
+        p.drawText(qMax(2.0, ml - 6.0 - fm.horizontalAdvance(u)),
+                   plot.bottom(), u);
+    }
+
+    // ── 波形绘制 (X=幅度, Y=采样点序号) ──
+    // 仅在收到真实波形数据后才绘制，无数据时只显示网格+坐标轴
+    if (m_isLive && N >= 2) {
         QPainterPath path;
-        const double amp = plot.height() * 0.44;
+        const double ampW = plot.width();              // 100% 幅度 = 全宽
+        const double yScale = double(plot.height()) / double(N - 1);
 
-        if (isRF) {
-            path.moveTo(plot.left(),
-                        midY - qBound(-1.0, m_data[0], 1.0) * amp);
-            for (int i = 1; i < N; ++i) {
-                const double x = plot.left() +
-                    double(i) / double(N - 1) * plot.width();
-                const double y = midY - qBound(-1.0, m_data[i], 1.0) * amp;
-                path.lineTo(x, y);
-            }
-        } else {
-            const double baseY = plot.bottom() - 2;
-            path.moveTo(plot.left(),
-                        baseY - qBound(0.0, m_data[0], 1.0) * plot.height() * 0.92);
-            for (int i = 1; i < N; ++i) {
-                const double x = plot.left() +
-                    double(i) / double(N - 1) * plot.width();
-                const double y = baseY - qBound(0.0, m_data[i], 1.0) * plot.height() * 0.92;
-                path.lineTo(x, y);
-            }
+        auto clampA = [](double v) { return qBound(0.0, v, 1.0); };
+
+        path.moveTo(plot.left() + clampA(m_data[0]) * ampW,
+                    double(plot.top()));
+        for (int i = 1; i < N; ++i) {
+            path.lineTo(plot.left() + clampA(m_data[i]) * ampW,
+                        plot.top() + double(i) * yScale);
         }
 
-        QColor waveColor = m_isLive ? QColor(0, 255, 42) : QColor(80, 190, 100);
-        p.setPen(QPen(waveColor, 1.2));
+        p.setPen(QPen(QColor(0, 255, 42), 1.2));
+        p.setBrush(Qt::NoBrush);
         p.drawPath(path);
     }
 
-    // ── HUD 叠加信息 ──
-    p.setFont(QFont("Consolas", 9));
-    const int hudX = plot.right() - 10;
+    // ── 闸门绘制 (同MFC: 竖线, X=阈值; 回放时用replayGates) ──
+    if (m_gatesVisible) {
+        const float rng = m_replay ? m_replayRange : float(totalMm);
+        for (int g = 0; g < 3; ++g) {
+            const GateDef &gate = m_replay ? m_replayGates[g] : m_gates[g];
+            if (!gate.enabled) continue;
 
-    static const char *modeNames[] = { "QW", "ZW", "FW", "RF" };
-    const char *modeName = (m_rectifyMode >= 0 && m_rectifyMode <= 3)
-                           ? modeNames[m_rectifyMode] : "??";
+            const double y1 = plot.top() + (gate.start / rng) * plot.height();
+            const double y2 = plot.top() + ((gate.start + gate.width) / rng) * plot.height();
+            const double thX = plot.left() + (gate.threshold / 100.0) * plot.width();
 
-    p.setPen(m_isLive ? QColor(0, 220, 50, 220) : QColor(80, 100, 80, 160));
-    p.drawText(hudX - 260, plot.top() + 14, 260, 16,
-               Qt::AlignRight,
-               QString("Beam %1  Frame %2  %3  %.1fmm  %4 FPS")
-                   .arg(m_beamIndex)
-                   .arg(m_frameIndex)
-                   .arg(QString::fromLatin1(modeName))
-                   .arg(totalMm, 0, 'f', 1)
-                   .arg(m_currentFps, 0, 'f', 1));
+            // 竖线
+            p.setPen(QPen(gate.color, 2));
+            p.drawLine(QPointF(thX, y1), QPointF(thX, y2));
+            // 起止横标
+            p.drawLine(QPointF(thX - 5, y1), QPointF(thX + 5, y1));
+            p.drawLine(QPointF(thX - 5, y2), QPointF(thX + 5, y2));
+            // 标签
+            static const char *lbl[] = {"A", "B", "C"};
+            QFont gf("Microsoft YaHei", 11); gf.setBold(true);
+            p.setFont(gf);
+            p.setPen(gate.color);
+            p.drawText(QPointF(thX + 4, y1 + 14), QString::fromLatin1(lbl[g]));
+        }
+    }
 
-    // ── LIVE / 模拟 状态指示 ──
-    const QPointF dotPos(plot.left() + 6, plot.top() + 6);
-    p.setPen(Qt::NoPen);
-    p.setBrush(m_isLive ? QColor(0, 255, 42, 220) : QColor(120, 140, 120, 120));
-    p.drawEllipse(dotPos, 4, 4);
-    p.setPen(m_isLive ? QColor(0, 200, 40, 200) : QColor(120, 140, 120, 110));
-    p.setFont(QFont("Microsoft YaHei", 8));
-    p.drawText(plot.left() + 16, plot.top() + 12,
-               m_isLive ? QString::fromUtf8("LIVE") : QString::fromUtf8("SIM"));
+    // ── HUD ──
+    {
+        QFont hud("Consolas", 8);
+        p.setFont(hud);
+        const QFontMetrics hm(hud);
+        static const char *modes[] = {"QW", "ZW", "FW", "RF"};
+        const char *mn = (m_rectifyMode >= 0 && m_rectifyMode <= 3) ? modes[m_rectifyMode] : "??";
+        QString txt = QString("Beam %1  Frame %2  %3  %.1fmm  %4 FPS")
+            .arg(m_beamIndex).arg(m_frameIndex).arg(mn).arg(totalMm, 0, 'f', 1).arg(m_currentFps, 0, 'f', 1);
+        if (m_replay) txt += "  REPLAY";
+        p.setPen(m_isLive ? QColor(0, 220, 50, 200) : QColor(80, 100, 80, 150));
+        p.drawText(plot.right() - hm.horizontalAdvance(txt) - 4,
+                   plot.top() + 12, txt);
+
+        // 状态圆点
+        const QPointF dot(plot.left() + 6, plot.top() + 6);
+        p.setPen(Qt::NoPen);
+        p.setBrush(m_alarm ? QColor(255, 50, 50, 220)
+                 : m_frozen ? QColor(255, 180, 50, 220)
+                 : m_isLive ? QColor(0, 255, 42, 220) : QColor(120, 140, 120, 120));
+        p.drawEllipse(dot, 4, 4);
+        p.setPen(m_alarm ? QColor(255, 80, 80, 200)
+                 : m_frozen ? QColor(255, 200, 80, 200)
+                 : m_isLive ? QColor(0, 200, 40, 200) : QColor(120, 140, 120, 110));
+        p.setFont(QFont("Microsoft YaHei", 8));
+        p.drawText(plot.left() + 16, plot.top() + 12,
+                   m_alarm ? "ALARM" :
+                   m_frozen ? "FROZEN" : m_isLive ? "LIVE" : "SIM");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 闸门拖拽（同 MFC OnLButtonDown: Y→起位, X→阈值）
+// ═══════════════════════════════════════════════════════════
+
+void AScanWidget::mousePressEvent(QMouseEvent *ev)
+{
+    const QRectF plot = plotRect();
+    if (ev->button() == Qt::LeftButton && plot.contains(ev->position())) {
+        // Ctrl+点击 → 切换声束
+        if (ev->modifiers() & Qt::ControlModifier) {
+            const int beamCount = 128;
+            const int beam = int((ev->position().y() - plot.top()) / plot.height() * beamCount);
+            emit beamChangeRequested(qBound(0, beam, beamCount - 1));
+        } else {
+            m_dragging = true;
+            const float totalMm = float(totalRangeMm());
+            const float px = float(ev->position().x());
+            const float py = float(ev->position().y());
+
+            // 检测是否点击在某个闸门附近（±8px），优先选最近的门
+            int hitGate = -1;
+            float bestDist = 12.0f;  // 命中阈值（像素）
+            for (int g = 2; g >= 0; --g) {  // 倒序：C/B/A, C在最前面
+                const GateDef &gate = m_gates[g];
+                if (!gate.enabled) continue;
+                const float thX = float(plot.left() + (gate.threshold / 100.0) * plot.width());
+                const float gy1 = float(plot.top() + (gate.start / totalMm) * plot.height());
+                const float gy2 = float(plot.top() + ((gate.start + gate.width) / totalMm) * plot.height());
+                if (py >= gy1 - 4 && py <= gy2 + 4 && qAbs(px - thX) < bestDist) {
+                    hitGate = g;
+                    bestDist = qAbs(px - thX);
+                }
+            }
+
+            if (hitGate >= 0)
+                m_activeGate = hitGate;
+
+            const int g = m_activeGate;
+            GateDef &gate = m_gates[g];
+
+            gate.start = qBound(0.0f, float(py - float(plot.top())) / float(plot.height()) * totalMm,
+                                totalMm - gate.width);
+            gate.threshold = qBound(0.0f, float(px - float(plot.left())) / float(plot.width()) * 100.0f, 99.0f);
+
+            update();
+            emit gateDragged(g, gate.start, gate.threshold);
+        }
+    }
+    QWidget::mousePressEvent(ev);
+}
+
+void AScanWidget::mouseMoveEvent(QMouseEvent *ev)
+{
+    if (!m_dragging) return;
+    const QRectF plot = plotRect();
+    const double totalMm = totalRangeMm();
+    const int g = m_activeGate;
+    GateDef &gate = m_gates[g];
+
+    // Y → start
+    gate.start = float((ev->position().y() - plot.top()) / plot.height() * totalMm);
+    gate.start = qBound(0.0f, float(gate.start), float(totalMm - gate.width));
+    // X → threshold
+    gate.threshold = float((ev->position().x() - plot.left()) / plot.width() * 100.0);
+    gate.threshold = qBound(0.0f, gate.threshold, 99.0f);
+
+    update();
+    emit gateDragged(g, gate.start, gate.threshold);
+}
+
+void AScanWidget::mouseReleaseEvent(QMouseEvent *ev)
+{
+    if (ev->button() == Qt::LeftButton && m_dragging) {
+        m_dragging = false;
+        // 最后一次更新确保最终位置精确
+        const QRectF plot = plotRect();
+        const double totalMm = totalRangeMm();
+        const int g = m_activeGate;
+        GateDef &gate = m_gates[g];
+
+        gate.start = float((ev->position().y() - plot.top()) / plot.height() * totalMm);
+        gate.start = qBound(0.0f, float(gate.start), float(totalMm - gate.width));
+        gate.threshold = float((ev->position().x() - plot.left()) / plot.width() * 100.0);
+        gate.threshold = qBound(0.0f, gate.threshold, 99.0f);
+
+        update();
+        emit gateDragged(g, gate.start, gate.threshold);
+    }
+    QWidget::mouseReleaseEvent(ev);
+}
+
+void AScanWidget::setReplayMode(bool on, float range, const GateDef gates[3])
+{
+    m_replay      = on;
+    m_replayRange = range;
+    for (int g = 0; g < 3; ++g)
+        m_replayGates[g] = gates[g];
+    update();
 }

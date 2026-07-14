@@ -1816,11 +1816,16 @@ void ParamPage::setupUi()
     btnLayout->setContentsMargins(8, 6, 8, 8);
     btnLayout->setSpacing(5);
 
-    auto *applyBtn = new QPushButton(QString::fromUtf8("应用法则"));
-    applyBtn->setObjectName("ApplyLawButton");
-    applyBtn->setCursor(Qt::PointingHandCursor);
-    applyBtn->setFixedHeight(34);
-    connect(applyBtn, &QPushButton::clicked, this, &ParamPage::onApplyLaw);
+    auto *loadBtn = new QPushButton(QString::fromUtf8("调用参数"));
+    loadBtn->setObjectName("LoadParamsButton");
+    loadBtn->setCursor(Qt::PointingHandCursor);
+    loadBtn->setFixedHeight(30);
+    loadBtn->setStyleSheet(
+        "QPushButton{background:#18536e;color:white;border:1px solid #3b7893;"
+        "border-radius:4px;font-weight:600;font-size:13px;}"
+        "QPushButton:hover{background:#126aa0;}"
+    );
+    connect(loadBtn, &QPushButton::clicked, this, &ParamPage::onLoadParams);
 
     auto *saveBtn = new QPushButton(QString::fromUtf8("保存参数"));
     saveBtn->setObjectName("SaveButton");
@@ -1843,7 +1848,7 @@ void ParamPage::setupUi()
 	m_replayDataBtn->setEnabled(false);
 	connect(m_replayDataBtn, &QPushButton::clicked, this, &ParamPage::onReplayData);
 
-    btnLayout->addWidget(applyBtn);
+    btnLayout->addWidget(loadBtn);
     btnLayout->addWidget(saveBtn);
 	btnLayout->addWidget(m_saveDataBtn);
 	btnLayout->addWidget(m_replayDataBtn);

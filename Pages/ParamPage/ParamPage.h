@@ -58,7 +58,6 @@ private:
     void onProbeTypeChanged(int idx);
     void onWedgeTypeChanged(int idx);
     void onMaterialChanged(int idx);
-    void onApplyLaw();
     void onSaveParams();
     void onLoadParams();
     void onGateSelectChanged(int idx);
@@ -80,6 +79,7 @@ public:
     /// A扫拖拽闸门回调（由 MainWindow 连接）
     void onGateDragged(int gate, float start, float threshold);
     void finishScan();
+    void onApplyLaw();
 
 signals:
     /// 闸门参数变化（任一门的 start/width/threshold 变化时发出）

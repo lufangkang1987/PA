@@ -28,6 +28,7 @@ signals:
     void exitRequested();
     void powerOffAndExitRequested();
     void loadParamsRequested();
+    void applyLawRequested();
 
 private:
     // ── 读数项 ──
@@ -44,7 +45,7 @@ private:
 
     // ── 按钮 ──
     QPushButton *m_freezeBtn;
-    QPushButton *m_loadParamsBtn;
+    QPushButton *m_applyLawBtn;
     QPushButton *m_screenshotBtn;
     QPushButton *m_exitBtn;
 

@@ -198,6 +198,8 @@ void MainWindow::setupUi()
             QString::fromUtf8("参数文件 (*.json *.ini *.param *.par);;所有文件 (*)"));
         if (!filePath.isEmpty()) loadParamsFile(filePath);
     });
+    connect(m_measurePage, &MeasurePage::applyLawRequested,
+            m_paramPage, &ParamPage::onApplyLaw);
 
     wireDriverSignals();
 

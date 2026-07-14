@@ -60,11 +60,16 @@ MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
     layout->addWidget(sep3);
 
     // ── 操作按钮 ──
-    m_loadParamsBtn = new QPushButton(QString::fromUtf8("调用参数"));
-    m_loadParamsBtn->setObjectName("LoadParamsBtn");
-    m_loadParamsBtn->setCursor(Qt::PointingHandCursor);
-    m_loadParamsBtn->setFixedHeight(30);
-    connect(m_loadParamsBtn, &QPushButton::clicked, this, &MeasurePage::loadParamsRequested);
+    m_applyLawBtn = new QPushButton(QString::fromUtf8("应用法则"));
+    m_applyLawBtn->setObjectName("ApplyLawButton");
+    m_applyLawBtn->setCursor(Qt::PointingHandCursor);
+    m_applyLawBtn->setFixedHeight(34);
+    m_applyLawBtn->setStyleSheet(
+        "QPushButton{background:#0a6e3b;color:white;border:1px solid #1a9e5e;"
+        "border-radius:4px;font-weight:600;font-size:13px;}"
+        "QPushButton:hover{background:#0e8a4d;}"
+    );
+    connect(m_applyLawBtn, &QPushButton::clicked, this, &MeasurePage::applyLawRequested);
 
     m_freezeBtn = new QPushButton(QString::fromUtf8("冻结"));
     m_freezeBtn->setObjectName("FreezeBtn");
@@ -96,7 +101,7 @@ MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
             emit exitRequested();
     });
 
-    layout->addWidget(m_loadParamsBtn);
+    layout->addWidget(m_applyLawBtn);
     layout->addWidget(m_freezeBtn);
     layout->addWidget(m_screenshotBtn);
     layout->addWidget(m_exitBtn);

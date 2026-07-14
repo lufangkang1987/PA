@@ -5,6 +5,8 @@
 #include <QResizeEvent>
 #include <QPainter>
 #include <QVector>
+#include "DataTypes.h"
+struct PAParams;
 class AScanWidget;
 class BScanWidget;
 class CScanWidget;
@@ -70,19 +72,40 @@ public:
 
 	// 冻结控制（转发到 AScanWidget）
 	void setFrozen(bool frozen);
+	void setAScanCalibrationGuide(bool visible, int targetPercent = 80);
 
 	// C扫数据存取（供 MainWindow 保存/回放）
 	QVector<float> getCScanData(int &w, int &h) const;
 	void setCScanReplayData(const QVector<float> &data, int w, int h, bool replayOn);
 	void setCScanReplayMode(bool on);
+	void setCScanData(const QVector<float> &data, int w, int h);
+	void updateCScanMetrics(int lines, int totalLines, double scannedMm,
+	                        double speedMmPerSec, double averageMmPerSec);
+	void updateFrameStatistics(int frameDiff, quint64 droppedFrames);
+	void showReplayPacket(const DataPacket &packet, int line, int beamIndex, int rectifyMode);
+	void selectCScanLine(int line);
+	void configureCScanView(const PAParams &params);
+	void setCScanImageSpan(float startMm, float endMm);
+	void setCScanPageStart(int line);
+	int cScanPageStart() const;
 
 signals:
 	void gateDragged(int gate, float start, float threshold);
 	void beamChangeRequested(int beamIndex);
+	void cScanPositionSelected(int line, int imageColumn);
+	void cScanAnalysisRectChanged(int line1, int line2, int column1, int column2);
+	void cScanAnalysisMeasured(float maximum, float average, int maxLine, int maxColumn);
 
 private:
 	AScanWidget* m_aScan;
 	BScanWidget* m_bScan;
 	CScanWidget* m_cScan;
 	QLabel*      m_status;
+	ElidedLabel* m_scanLengthStatus = nullptr;
+	ElidedLabel* m_scannedLengthStatus = nullptr;
+	ElidedLabel* m_progressStatus = nullptr;
+	ElidedLabel* m_speedStatus = nullptr;
+	ElidedLabel* m_analysisStatus = nullptr;
+	ElidedLabel* m_frameDiffStatus = nullptr;
+	ElidedLabel* m_droppedFrameStatus = nullptr;
 };

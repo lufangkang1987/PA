@@ -71,6 +71,13 @@ void AScanWidget::setGatesVisible(bool visible)
     update();
 }
 
+void AScanWidget::setCalibrationGuide(bool visible, int targetPercent)
+{
+    m_calibrationGuide = visible;
+    m_calibrationTarget = targetPercent == 50 ? 50 : 80;
+    update();
+}
+
 // ═══════════════════════════════════════════════════════════
 // 辅助：绘图区 / 总声程
 // ═══════════════════════════════════════════════════════════
@@ -123,21 +130,37 @@ void AScanWidget::paintEvent(QPaintEvent *)
         p.drawLine(plot.left(), y, plot.right(), y);
     }
 
+    if (m_calibrationGuide) {
+        p.setPen(QPen(QColor(0, 0, 255), 1));
+        for (const int percent : {m_calibrationTarget - 5, m_calibrationTarget + 5}) {
+            const double x = plot.left() + percent * plot.width() / 100.0;
+            p.drawLine(QPointF(x, plot.top()), QPointF(x, plot.bottom()));
+        }
+    }
+
     // ── X 轴标尺：幅度 % ──
     {
         p.setPen(QColor(160, 185, 200));
         QFont f("Microsoft YaHei", 9);
         p.setFont(f);
         const QFontMetrics fm(f);
+        const int textH = fm.ascent();
         for (int i = 0; i <= 5; ++i) {
             const int pct = i * 20;
             const double x = plot.left() + i * plot.width() / 5.0;
             p.drawLine(QPointF(x, plot.bottom()), QPointF(x, plot.bottom() + 4));
-            const QString s = QString::number(pct);
-            p.drawText(qBound(plot.left(), x - fm.horizontalAdvance(s) / 2.0,
-                              plot.right() - 20.0), plot.bottom() + 16, s);
+            const QString s = QString("%1%").arg(pct);
+            const int textW = fm.horizontalAdvance(s);
+            // 首尾标签靠边对齐避免溢出，其余居中
+            double textX;
+            if (i == 0)
+                textX = plot.left();
+            else if (i == 5)
+                textX = plot.right() - textW;
+            else
+                textX = x - textW / 2.0;
+            p.drawText(QPointF(textX, plot.bottom() + 5 + textH), s);
         }
-        p.drawText(plot.right() - 16, plot.bottom() + 16, "%");
     }
 
     // ── Y 轴标尺：深度 mm ──
@@ -147,17 +170,26 @@ void AScanWidget::paintEvent(QPaintEvent *)
         p.setFont(f);
         const QFontMetrics fm(f);
         const int ml = int(plot.left());
+        const int textH = fm.ascent();
         for (int i = 0; i <= 5; ++i) {
             const double mm = totalMm * i / 5.0;
             const double y = plot.top() + i * plot.height() / 5.0;
             p.drawLine(QPointF(ml - 4, y), QPointF(ml, y));
             const QString s = QString::number(mm, 'f', 1);
-            p.drawText(qMax(2.0, ml - 6.0 - fm.horizontalAdvance(s)),
-                       y + fm.ascent() / 2.0, s);
+            // 统一右对齐
+            p.drawText(QPointF(ml - 6 - fm.horizontalAdvance(s),
+                               y + textH / 3), s);
         }
-        const QString u = "mm";
-        p.drawText(qMax(2.0, ml - 6.0 - fm.horizontalAdvance(u)),
-                   plot.bottom(), u);
+        // 单位 "mm" 旋转标注在 Y 轴左侧
+        p.save();
+        const QString unit = "mm";
+        const int unitW = fm.horizontalAdvance(unit);
+        p.translate(qMax(4.0, ml - 10.0 - fm.horizontalAdvance(
+            QString::number(totalMm, 'f', 1))),
+                    plot.top() + plot.height() / 2.0);
+        p.rotate(-90);
+        p.drawText(QPointF(-unitW / 2, 0), unit);
+        p.restore();
     }
 
     // ── 波形绘制 (X=幅度, Y=采样点序号) ──

@@ -3,6 +3,7 @@
 #include <QFrame>
 #include <QLabel>
 #include <QMessageBox>
+#include <cmath>
 
 MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
 {
@@ -135,26 +136,30 @@ MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
     )");
 }
 
-void MeasurePage::updateGateReadings(char gate, double ampRaw, double pathRaw)
+void MeasurePage::updateGateReadings(char gate, double amplitudePercent, double soundPathMm,
+                                     double angleDegrees, double horizontalOffsetMm)
 {
     // ampRaw: 硬件 uint8 (0-255)，转换为百分比 (0-100%)
     //   若值 <= 100，假定硬件已直接给百分比
     //   若值 > 100，假定 0-255 满量程映射
-    double ampPct = (ampRaw > 100.0) ? (ampRaw * 100.0 / 255.0) : ampRaw;
     // pathRaw: 硬件 uint16，单位 0.1mm → mm
-    double pathMm = pathRaw / 10.0;
+    constexpr double Pi = 3.14159265358979323846;
+    const double radians = qAbs(angleDegrees) * Pi / 180.0;
+    const double horizontal = soundPathMm * std::sin(radians) + horizontalOffsetMm;
+    const double vertical = soundPathMm * std::cos(radians);
 
     if (gate == 'A') {
-        m_gateAAmpReading->setValue(ampPct, 1);
-        m_gateAPathReading->setValue(pathMm, 1);
+        m_gateAAmpReading->setValue(amplitudePercent, 1);
+        m_gateAPathReading->setValue(soundPathMm, 1);
         // 水平/垂直：需配合编码器+闸门触发逻辑，暂无数据
         m_aHorizontalReading->setValue("--");
-        m_aVerticalReading->setValue("--");
+        m_aHorizontalReading->setValue(horizontal, 1);
+        m_aVerticalReading->setValue(vertical, 1);
     } else if (gate == 'B') {
-        m_gateBAmpReading->setValue(ampPct, 1);
-        m_gateBPathReading->setValue(pathMm, 1);
-        m_bHorizontalReading->setValue("--");
-        m_bVerticalReading->setValue("--");
+        m_gateBAmpReading->setValue(amplitudePercent, 1);
+        m_gateBPathReading->setValue(soundPathMm, 1);
+        m_bHorizontalReading->setValue(horizontal, 1);
+        m_bVerticalReading->setValue(vertical, 1);
     }
     // Gate C: 耦合监视闸门，右侧面板不显示读数
 }

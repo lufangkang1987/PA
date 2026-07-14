@@ -1,5 +1,6 @@
 #pragma once
 #include "IDriver.h"
+#include "PAParams.h"
 #include "DataTypes.h"
 #include <QObject>
 #include <QTcpSocket>
@@ -108,6 +109,7 @@ public:
     void setScanType(int type) override;
     void setAnalogGain(float dB) override;
     void setDigitalGain(float dB) override;
+    void setTemperatureCompensation(bool enabled) override;
     void setHighVoltage(int level) override;
     void setPulseWidth(int width) override;
     void setPRF(int prf) override;
@@ -123,6 +125,8 @@ public:
     void setCommonRDelay() override;
     void setTFMImageProcess(double subtract, double supress, double smooth) override;
     void resetEncoder(int idx) override;
+    void setACG(bool enabled, const PAParams &params);
+    void setTCG(bool enabled, const PAParams &params);
 
     // -------- 扫查配置 setter（供"应用法则"批量下发）--------
     void setVelocity(float mps) override;
@@ -159,12 +163,15 @@ signals:
 
     /// 全部 128 声束波形（用于 B 扫描 softwareImaging）
     void multiBeamWaveformsReady(const QVector<QVector<double>> &waveforms);
+    void dataPacketReady(const DataPacket &packet);
 
     // -------- 闸门读数 --------
     void gateReadingsReady(char gate, double amplitude, double path);
 
     // -------- 编码器位置 --------
     void encoderPositionChanged(int position);
+    void frameStatisticsChanged(int frameDiff, quint64 droppedFrames);
+    void scanRulePositionsReady(const QVector<double> &positions);
 
     // -------- TFM 数据 --------
     void tfmImageReady(const QVector<int> &image);
@@ -209,10 +216,18 @@ private:
     int          m_scanType    = 0;
     int          m_beamCount   = 128;
     int          m_frameCount  = 0;
+    bool         m_hasLastWaveFrame = false;
+    quint16      m_lastWaveFrame = 0;
+    int          m_lastReportedFrameDiff = -1;
+    quint64      m_droppedFrames = 0;
 
     // 参数缓存（用于构造全量 scan_type 命令）
     float m_analogGain   = 40.0f;
     float m_digitalGain  = 0.0f;
+    bool  m_tempCorrect  = true;
+    int   m_xadcTemp     = 30;
+    int   m_lastCompTemp = -100;
+    QTimer *m_monitorTimer = nullptr;
     int   m_highVoltage  = 1;     // 110V
     int   m_pulseWidth   = 100;
     int   m_prf          = 2000;

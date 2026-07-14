@@ -50,6 +50,7 @@ public slots:
 
     /// 显示/隐藏所有闸门
     void setGatesVisible(bool visible);
+    void setCalibrationGuide(bool visible, int targetPercent = 80);
 
     /// 设置当前拖拽闸门 (0=A, 1=B, 2=C)
     void setActiveGate(int gate) { m_activeGate = gate; }
@@ -96,6 +97,8 @@ private:
     bool    m_dragging   = false;    // 正在拖拽中
     bool    m_alarm      = false;    // 报警状态
     bool    m_replay     = false;    // 回放模式
+    bool    m_calibrationGuide = false;
+    int     m_calibrationTarget = 80;
     float   m_replayRange= 0.0f;
     GateDef m_replayGates[3];        // 回放用的闸门参数
     QElapsedTimer m_fpsTimer;

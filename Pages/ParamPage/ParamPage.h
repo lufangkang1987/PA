@@ -18,12 +18,20 @@ class ParamPage : public QFrame
 public:
     explicit ParamPage(QWidget *parent = nullptr);
     void setDriver(IDriver *driver);
+    bool initializeParams();
+    void applyCurrentParams();
 
     /// 获取闸门参数（供外部读取后更新 AScanWidget 闸门显示）
     void getGateParams(int gate, bool &enabled, float &start, float &width,
                        float &threshold) const;
     int  activeGate() const { return m_params.gateSelect; }
+    const PAParams &params() const { return m_params; }
     void setBeamNo(int beam);
+    void setAnalysisRect(int line1, int line2, int column1, int column2);
+    void setCalibratedVelocity(int velocity);
+    void setCalibratedProbeDelay(float delayUs);
+    void setCalibratedACG(const QVector<float> &values);
+    void setCalibratedCoderDeg(float mmPerPulse);
 
 private:
     void setupUi();
@@ -71,6 +79,7 @@ public:
 public:
     /// A扫拖拽闸门回调（由 MainWindow 连接）
     void onGateDragged(int gate, float start, float threshold);
+    void finishScan();
 
 signals:
     /// 闸门参数变化（任一门的 start/width/threshold 变化时发出）
@@ -80,9 +89,17 @@ signals:
     void scanStopped();
     /// 保存数据 / 回放数据（由 MainWindow 连接处理，携带文件路径）
     void saveDataRequested(const QString &filePath);
+    void saveLegacyDataRequested(const QString &filePath);
     void replayDataRequested(const QString &filePath);
+    void cScanPageRequested();
+    void exitReplayRequested();
     /// 当前声束号 / 增益变化 → 右侧 MeasurePage 读数
     void beamInfoChanged(int beamNo, double gainDb);
+    void calibrationRequested(int item);
+    void encoderCalibrationRequested();
+    void cScanViewParamsChanged();
+    void legacyParamsLoadRequested(const QString &filePath);
+    void legacyParamsSaveRequested(const QString &filePath);
 
 private:
     QListWidget   *m_nav      = nullptr;
@@ -94,7 +111,9 @@ private:
     QDoubleSpinBox *m_gateWidthSpin   = nullptr;
     QDoubleSpinBox *m_gateThreshSpin  = nullptr;
     QComboBox      *m_gateMeasureCombo = nullptr;
-    QComboBox      *m_alarmCombo      = nullptr;
+    QComboBox      *m_gateAlarmCombo  = nullptr;  // 逐闸门报警开关 (gateAlarm[g])
+    QComboBox      *m_gateTraceCombo  = nullptr;  // 逐闸门跟踪开关 (gateTrace[g])
+    QComboBox      *m_alarmSoundCombo = nullptr;  // 全局蜂鸣报警声 (alarmSound)
 
     // 扫查页面动态控件
     QLabel        *m_scanLabels[7]   = {};
@@ -145,6 +164,11 @@ private:
     // C扫数据按钮（仅在成像/编码器/分析页可用）
     QPushButton   *m_saveDataBtn     = nullptr;
     QPushButton   *m_replayDataBtn   = nullptr;
+    QPushButton   *m_calibrationBtn  = nullptr;
+    QPushButton   *m_encoderCalibrationBtn = nullptr;
+    QSpinBox      *m_imagingLineSpin[4] = {};
+    QDoubleSpinBox *m_degPerPointSpin = nullptr;
+    QSpinBox      *m_analysisLineSpin[4] = {};
 
     // 导航折叠状态
     int            m_activeRow       = -1;  // 当前展开的导航项，-1=全部折叠

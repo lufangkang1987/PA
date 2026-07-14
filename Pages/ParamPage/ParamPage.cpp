@@ -22,10 +22,11 @@
 #include <QJsonArray>
 #include <QCoreApplication>
 #include <QDir>
+#include <cmath>
 
 namespace {
 constexpr int kSidebarWidth = 170;
-constexpr int kStackWidth = 430;
+constexpr int kStackWidth = 215;
 constexpr int kPanelBorderWidth = 1;
 constexpr int kPanelPadding = 1;
 // 总内边距 = border(1px) + padding(1px) = 2px，为 6px 圆角留出空间
@@ -49,10 +50,12 @@ static void polishField(QWidget *w)
 static QFormLayout *makeForm(QGroupBox *box)
 {
     auto *f = new QFormLayout(box);
-    f->setContentsMargins(16, 18, 16, 16);
-    f->setHorizontalSpacing(12);
-    f->setVerticalSpacing(10);
-    f->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    f->setContentsMargins(8, 12, 8, 10);
+    f->setHorizontalSpacing(6);
+    f->setVerticalSpacing(7);
+    f->setRowWrapPolicy(QFormLayout::WrapAllRows);
+    f->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    f->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     f->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
     return f;
 }
@@ -221,6 +224,7 @@ void ParamPage::buildTransmitPage()
     });
     connect(m_tempCorrectCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params.tempCorrect = v;
+        if (m_driver) m_driver->setTemperatureCompensation(v != 0);
     });
     connect(m_aDataLenCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params.aDataLen = v;
@@ -320,28 +324,48 @@ void ParamPage::buildGatePage()
     f->addRow("闸门选择", m_gateSelCombo);
 
     // 闸门起位: 步进 [0.1, 1.0, 10.0] mm, 默认1.0
-    m_gateStartSpin = makeDoubleSpin(0.0, 999.0, m_params.gateStart[0], 0.1, "mm");
+    m_gateStartSpin = makeDoubleSpin(0.0, 999.0,
+        m_params.gateStart[qBound(0, m_params.gateSelect, 2)], 0.1, "mm");
     connect(m_gateStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &ParamPage::onGateParamChanged);
     f->addRow("闸门起位", wrapWithStepSelector(m_gateStartSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
     // 闸门宽度: 步进 [0.1, 1.0, 10.0] mm, 默认1.0
-    m_gateWidthSpin = makeDoubleSpin(0.0, 999.0, m_params.gateWidth[0], 0.1, "mm");
+    m_gateWidthSpin = makeDoubleSpin(0.0, 999.0,
+        m_params.gateWidth[qBound(0, m_params.gateSelect, 2)], 0.1, "mm");
     connect(m_gateWidthSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &ParamPage::onGateParamChanged);
     f->addRow("闸门宽度", wrapWithStepSelector(m_gateWidthSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
     // 闸门高度: 步进 [0.1, 1.0, 10.0] %, 默认1.0
-    m_gateThreshSpin = makeDoubleSpin(0.0, 99.0, m_params.gateThreshold[0], 0.1, "%");
+    m_gateThreshSpin = makeDoubleSpin(0.0, 99.0,
+        m_params.gateThreshold[qBound(0, m_params.gateSelect, 2)], 0.1, "%");
     connect(m_gateThreshSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &ParamPage::onGateParamChanged);
     f->addRow("闸门高度", wrapWithStepSelector(m_gateThreshSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
-    m_gateMeasureCombo = makeCombo({"峰值", "前沿"}, 0);
+    m_gateMeasureCombo = makeCombo({"峰值", "前沿"},
+        m_params.gateMeasure[qBound(0, m_params.gateSelect, 2)]);
+    connect(m_gateMeasureCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &ParamPage::onGateParamChanged);
     f->addRow("测量方式", m_gateMeasureCombo);
 
-    m_alarmCombo = makeCombo({"关", "A 门", "B 门", "AB 门"}, m_params.alarmSound);
-    f->addRow("报警声", m_alarmCombo);
+    m_gateAlarmCombo = makeCombo({"关", "开"},
+        m_params.gateAlarm[qBound(0, m_params.gateSelect, 2)]);
+    connect(m_gateAlarmCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &ParamPage::onGateParamChanged);
+    f->addRow("报警开关", m_gateAlarmCombo);
+
+    m_gateTraceCombo = makeCombo({"关", "开"},
+        m_params.gateTrace[qBound(0, m_params.gateSelect, 2)]);
+    connect(m_gateTraceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &ParamPage::onGateParamChanged);
+    f->addRow("跟踪开关", m_gateTraceCombo);
+
+    m_alarmSoundCombo = makeCombo({"关", "A 门", "B 门", "AB 门"}, m_params.alarmSound);
+    connect(m_alarmSoundCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int idx) { m_params.alarmSound = idx; });
+    f->addRow("报警声", m_alarmSoundCombo);
 
     layout->addWidget(form);
     layout->addStretch();
@@ -517,8 +541,24 @@ void ParamPage::buildTcgPage()
     f->addRow("校准启用", calibEnable);
 
     layout->addWidget(form);
+    m_calibrationBtn = new QPushButton("开始 / 完成校准");
+    m_calibrationBtn->setFixedHeight(36);
+    layout->addWidget(m_calibrationBtn);
     layout->addStretch();
     m_stack->addWidget(page);
+
+    connect(calibItem, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this](int value) { m_params.calibItem = value; });
+    connect(realDist, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+            [this](double value) { m_params.realDistance = float(value); });
+    connect(beamDelay, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+            [this](double value) { m_params.beamDelay = float(value); });
+    connect(tcgCoeff, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+            [this](double value) { m_params.tcgCoeff = float(value); });
+    connect(calibEnable, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this](int value) { m_params.calibEnable = value; });
+    connect(m_calibrationBtn, &QPushButton::clicked, this,
+            [this] { emit calibrationRequested(m_params.calibItem); });
 }
 
 // ══════════════════════════════════════════════
@@ -533,12 +573,35 @@ void ParamPage::buildImagingPage()
 
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
+    f->setContentsMargins(5, 8, 5, 8);
 
-    f->addRow("采集线 X1", wrapWithStepSelector(makeIntSpin(0, 511, m_params.imgLineX1, 10), {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
-    f->addRow("采集线 X2", wrapWithStepSelector(makeIntSpin(0, 511, m_params.imgLineX2, 10), {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
-    f->addRow("采集线 Y1", wrapWithStepSelector(makeIntSpin(0, 399, m_params.imgLineY1, 10), {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
-    f->addRow("采集线 Y2", wrapWithStepSelector(makeIntSpin(0, 399, m_params.imgLineY2, 10), {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
-    f->addRow("C扫增量", wrapWithStepSelector(makeDoubleSpin(0.1, 5.0, m_params.degPerPoint, 0.1, "mm/d"), {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    auto compactField = [](QWidget *field) {
+        field->setMinimumWidth(0);
+        field->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        if (auto *step = field->findChild<QComboBox*>("StepCombo"))
+            step->setFixedWidth(48);
+        return field;
+    };
+
+    m_imagingLineSpin[0] = makeIntSpin(0, 511, m_params.imgLineX1, 10);
+    m_imagingLineSpin[1] = makeIntSpin(0, 511, m_params.imgLineX2, 10);
+    m_imagingLineSpin[2] = makeIntSpin(0, 399, m_params.imgLineY1, 10);
+    m_imagingLineSpin[3] = makeIntSpin(0, 399, m_params.imgLineY2, 10);
+    m_degPerPointSpin = makeDoubleSpin(0.1, 5.0, m_params.degPerPoint, 0.1, "mm/d");
+    f->addRow("采集线 X1", compactField(wrapWithStepSelector(m_imagingLineSpin[0], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
+    f->addRow("采集线 X2", compactField(wrapWithStepSelector(m_imagingLineSpin[1], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
+    f->addRow("采集线 Y1", compactField(wrapWithStepSelector(m_imagingLineSpin[2], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
+    f->addRow("采集线 Y2", compactField(wrapWithStepSelector(m_imagingLineSpin[3], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
+    f->addRow("C扫增量", compactField(wrapWithStepSelector(m_degPerPointSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1)));
+    for (int i = 0; i < 4; ++i)
+        connect(m_imagingLineSpin[i], QOverload<int>::of(&QSpinBox::valueChanged), this, [this, i](int value) {
+            int *fields[] = {&m_params.imgLineX1, &m_params.imgLineX2,
+                             &m_params.imgLineY1, &m_params.imgLineY2};
+            *fields[i] = value;
+            emit cScanViewParamsChanged();
+        });
+    connect(m_degPerPointSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+            [this](double value) { m_params.degPerPoint = float(value); emit cScanViewParamsChanged(); });
 
     layout->addWidget(form);
 
@@ -546,7 +609,7 @@ void ParamPage::buildImagingPage()
     auto *btnFrame = new QFrame;
     btnFrame->setObjectName("ScanButtonFrame");
     auto *btnLayout = new QVBoxLayout(btnFrame);
-    btnLayout->setContentsMargins(16, 12, 16, 12);
+    btnLayout->setContentsMargins(6, 10, 6, 10);
     btnLayout->setSpacing(8);
 
     m_scanBtn = new QPushButton("开始扫描");
@@ -576,6 +639,8 @@ void ParamPage::buildImagingPage()
     auto *hintLabel = new QLabel("点击按钮开始/停止 C 扫描数据采集");
     hintLabel->setObjectName("HintLabel");
     hintLabel->setAlignment(Qt::AlignCenter);
+    hintLabel->setMinimumWidth(0);
+    hintLabel->setWordWrap(true);
     btnLayout->addWidget(hintLabel);
 
     layout->addWidget(btnFrame);
@@ -591,11 +656,15 @@ void ParamPage::buildEncoderPage()
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
-    f->addRow("成像方向", makeCombo({"正向", "反向"}, m_params.direction));
-    f->addRow("编码精度", wrapWithStepSelector(makeDoubleSpin(0.001, 10.0, m_params.coderDeg, 0.01, "mm/p", 3), {"0.001", "0.01", "0.1"}, {0.001, 0.01, 0.1}, 1));
-    f->addRow("校准距离", wrapWithStepSelector(makeDoubleSpin(1.0, 200.0, m_params.checkDistance, 0.1, "mm"), {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    auto *direction = makeCombo({"正向", "反向"}, m_params.direction);
+    auto *coderDeg = makeDoubleSpin(0.001, 10.0, m_params.coderDeg, 0.01, "mm/p", 3);
+    auto *checkDistance = makeDoubleSpin(1.0, 200.0, m_params.checkDistance, 0.1, "mm");
+    f->addRow("成像方向", direction);
+    f->addRow("编码精度", wrapWithStepSelector(coderDeg, {"0.001", "0.01", "0.1"}, {0.001, 0.01, 0.1}, 1));
+    f->addRow("校准距离", wrapWithStepSelector(checkDistance, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
-    auto *calBtn = new QPushButton("开始 / 结束校准");
+    m_encoderCalibrationBtn = new QPushButton("开始 / 结束校准");
+    auto *calBtn = m_encoderCalibrationBtn;
     calBtn->setFixedHeight(36);
     calBtn->setCursor(Qt::PointingHandCursor);
     calBtn->setStyleSheet(
@@ -604,6 +673,13 @@ void ParamPage::buildEncoderPage()
         "QPushButton:hover{background:#126aa0;}"
     );
     f->addRow("", calBtn);
+    connect(direction, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this](int value) { m_params.direction = value; });
+    connect(coderDeg, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+            [this](double value) { m_params.coderDeg = float(value); });
+    connect(checkDistance, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+            [this](double value) { m_params.checkDistance = float(value); });
+    connect(calBtn, &QPushButton::clicked, this, &ParamPage::encoderCalibrationRequested);
 
     layout->addWidget(form);
     layout->addStretch();
@@ -618,10 +694,20 @@ void ParamPage::buildAnalysisPage()
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
-    f->addRow("测量线 X1", wrapWithStepSelector(makeIntSpin(0, 924, m_params.anaLineX1, 10), {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
-    f->addRow("测量线 X2", wrapWithStepSelector(makeIntSpin(0, 924, m_params.anaLineX2, 10), {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
-    f->addRow("测量线 Y1", wrapWithStepSelector(makeIntSpin(0, 400, m_params.anaLineY1, 10), {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
-    f->addRow("测量线 Y2", wrapWithStepSelector(makeIntSpin(0, 400, m_params.anaLineY2, 10), {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
+    m_analysisLineSpin[0] = makeIntSpin(0, 924, m_params.anaLineX1, 10);
+    m_analysisLineSpin[1] = makeIntSpin(0, 924, m_params.anaLineX2, 10);
+    m_analysisLineSpin[2] = makeIntSpin(0, 249, m_params.anaLineY1, 10);
+    m_analysisLineSpin[3] = makeIntSpin(0, 249, m_params.anaLineY2, 10);
+    const char *labels[] = {"测量线 X1", "测量线 X2", "测量线 Y1", "测量线 Y2"};
+    for (int i = 0; i < 4; ++i) {
+        f->addRow(labels[i], wrapWithStepSelector(m_analysisLineSpin[i], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
+        connect(m_analysisLineSpin[i], QOverload<int>::of(&QSpinBox::valueChanged), this, [this, i](int value) {
+            int *fields[] = {&m_params.anaLineX1, &m_params.anaLineX2,
+                             &m_params.anaLineY1, &m_params.anaLineY2};
+            *fields[i] = value;
+            emit cScanViewParamsChanged();
+        });
+    }
 
     const QString btnStyle = QString(
         "QPushButton{background:#18536e;color:white;border:1px solid #3b7893;"
@@ -633,12 +719,14 @@ void ParamPage::buildAnalysisPage()
     pageBtn->setFixedHeight(36);
     pageBtn->setCursor(Qt::PointingHandCursor);
     pageBtn->setStyleSheet(btnStyle);
+    connect(pageBtn, &QPushButton::clicked, this, &ParamPage::cScanPageRequested);
     f->addRow("", pageBtn);
 
     auto *exitBtn = new QPushButton("退出回放");
     exitBtn->setFixedHeight(36);
     exitBtn->setCursor(Qt::PointingHandCursor);
     exitBtn->setStyleSheet(btnStyle);
+    connect(exitBtn, &QPushButton::clicked, this, &ParamPage::exitReplayRequested);
     f->addRow("", exitBtn);
 
     layout->addWidget(form);
@@ -688,6 +776,12 @@ void ParamPage::onScanButtonClicked()
         );
         emit scanStopped();
     }
+}
+
+void ParamPage::finishScan()
+{
+    if (m_scanning)
+        onScanButtonClicked();
 }
 
 // ──────────────────────────────────────────────
@@ -747,6 +841,28 @@ void ParamPage::onScanTypeChanged(int idx)
                 break;
         }
         if (wrappedField) {
+            QSpinBox *intField = qobject_cast<QSpinBox *>(wrappedField);
+            if (!intField) intField = wrappedField->findChild<QSpinBox *>();
+            QDoubleSpinBox *doubleField = qobject_cast<QDoubleSpinBox *>(wrappedField);
+            if (!doubleField) doubleField = wrappedField->findChild<QDoubleSpinBox *>();
+
+            if (intField) {
+                connect(intField, QOverload<int>::of(&QSpinBox::valueChanged), this,
+                        [this, i](int value) {
+                    if (i == 1) m_params.eleStart = value;
+                    else if (i == 2) m_params.eleEnd = value;
+                    else if (i == 3) m_params.eleAperture = value;
+                });
+            } else if (doubleField) {
+                connect(doubleField, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+                        [this, idx, i](double value) {
+                    if (idx == 0 && i == 4) m_params.angleFrom = static_cast<float>(value);
+                    else if (idx == 0 && i == 5) m_params.angleTo = static_cast<float>(value);
+                    else if (idx == 0 && i == 6) m_params.focus = static_cast<float>(value);
+                    else if (idx == 1 && i == 4) m_params.angle = static_cast<float>(value);
+                    else if (idx == 1 && i == 5) m_params.focus = static_cast<float>(value);
+                });
+            }
             wrappedField->setParent(m_scanWidgets[i]);
             row->addWidget(wrappedField);
         }
@@ -784,14 +900,23 @@ void ParamPage::onGateSelectChanged(int idx)
     m_gateStartSpin->blockSignals(true);
     m_gateWidthSpin->blockSignals(true);
     m_gateThreshSpin->blockSignals(true);
+    m_gateMeasureCombo->blockSignals(true);
+    m_gateAlarmCombo->blockSignals(true);
+    m_gateTraceCombo->blockSignals(true);
 
     m_gateStartSpin->setValue(m_params.gateStart[idx]);
     m_gateWidthSpin->setValue(m_params.gateWidth[idx]);
     m_gateThreshSpin->setValue(m_params.gateThreshold[idx]);
+    m_gateMeasureCombo->setCurrentIndex(m_params.gateMeasure[idx]);
+    m_gateAlarmCombo->setCurrentIndex(m_params.gateAlarm[idx]);
+    m_gateTraceCombo->setCurrentIndex(m_params.gateTrace[idx]);
 
     m_gateStartSpin->blockSignals(false);
     m_gateWidthSpin->blockSignals(false);
     m_gateThreshSpin->blockSignals(false);
+    m_gateMeasureCombo->blockSignals(false);
+    m_gateAlarmCombo->blockSignals(false);
+    m_gateTraceCombo->blockSignals(false);
 
     // 通知 HomePage 更新活跃闸门
     emit gateParamsChanged();
@@ -804,6 +929,9 @@ void ParamPage::onGateParamChanged()
     m_params.gateStart[g]     = static_cast<float>(m_gateStartSpin->value());
     m_params.gateWidth[g]     = static_cast<float>(m_gateWidthSpin->value());
     m_params.gateThreshold[g] = static_cast<float>(m_gateThreshSpin->value());
+    m_params.gateMeasure[g]   = m_gateMeasureCombo->currentIndex();
+    m_params.gateAlarm[g]     = m_gateAlarmCombo->currentIndex();
+    m_params.gateTrace[g]     = m_gateTraceCombo->currentIndex();
 
     // 下发到硬件
     if (m_driver)
@@ -837,12 +965,21 @@ void ParamPage::onGateDragged(int gate, float start, float threshold)
     m_gateStartSpin->blockSignals(true);
     m_gateWidthSpin->blockSignals(true);
     m_gateThreshSpin->blockSignals(true);
+    m_gateMeasureCombo->blockSignals(true);
+    m_gateAlarmCombo->blockSignals(true);
+    m_gateTraceCombo->blockSignals(true);
     m_gateStartSpin->setValue(start);
     m_gateWidthSpin->setValue(m_params.gateWidth[gate]);
     m_gateThreshSpin->setValue(threshold);
+    m_gateMeasureCombo->setCurrentIndex(m_params.gateMeasure[gate]);
+    m_gateAlarmCombo->setCurrentIndex(m_params.gateAlarm[gate]);
+    m_gateTraceCombo->setCurrentIndex(m_params.gateTrace[gate]);
     m_gateStartSpin->blockSignals(false);
     m_gateWidthSpin->blockSignals(false);
     m_gateThreshSpin->blockSignals(false);
+    m_gateMeasureCombo->blockSignals(false);
+    m_gateAlarmCombo->blockSignals(false);
+    m_gateTraceCombo->blockSignals(false);
 
     // 下发硬件
     if (m_driver)
@@ -856,7 +993,7 @@ void ParamPage::getGateParams(int gate, bool &enabled, float &start, float &widt
                               float &threshold) const
 {
     if (gate < 0 || gate > 2) return;
-    enabled   = true;  // 默认启用，后续可通过 alarmSound 控制
+    enabled   = m_params.gateAlarm[gate] != 0;
     start     = m_params.gateStart[gate];
     width     = m_params.gateWidth[gate];
     threshold = m_params.gateThreshold[gate];
@@ -880,6 +1017,45 @@ void ParamPage::setBeamNo(int beam)
         m_beamNoSpin->blockSignals(false);
     }
     emit beamInfoChanged(beam, m_params.aGain);
+}
+
+void ParamPage::setAnalysisRect(int line1, int line2, int column1, int column2)
+{
+    m_params.anaLineX1 = line1;
+    m_params.anaLineX2 = line2;
+    m_params.anaLineY1 = column1;
+    m_params.anaLineY2 = column2;
+    const int values[] = {line1, line2, column1, column2};
+    for (int i = 0; i < 4; ++i) {
+        if (!m_analysisLineSpin[i]) continue;
+        QSignalBlocker blocker(m_analysisLineSpin[i]);
+        m_analysisLineSpin[i]->setValue(values[i]);
+    }
+}
+
+void ParamPage::setCalibratedVelocity(int velocity)
+{
+    m_params.lVelocity = qBound(m_params.wedgeVelocity, velocity, 9000);
+    if (m_lVelSpin) m_lVelSpin->setValue(m_params.lVelocity);
+}
+
+void ParamPage::setCalibratedProbeDelay(float delayUs)
+{
+    m_params.probeDelay = qBound(0.0f, delayUs, 100.0f);
+    m_params.beamDelay = m_params.probeDelay;
+}
+
+void ParamPage::setCalibratedACG(const QVector<float> &values)
+{
+    const int count = qMin(values.size(), MaxBeams);
+    for (int i = 0; i < count; ++i)
+        m_params.acgValue[i] = qBound(0.0f, values[i], 256.0f);
+    m_params.acgSwitch = 1;
+}
+
+void ParamPage::setCalibratedCoderDeg(float mmPerPulse)
+{
+    if (mmPerPulse > 0.0f) m_params.coderDeg = mmPerPulse;
 }
 
 void ParamPage::onApplyLaw()
@@ -907,6 +1083,7 @@ void ParamPage::onApplyLaw()
     // ── 3. 重发独立参数（确保硬件状态与 UI 一致）──
     m_driver->setAnalogGain(m_params.aGain);
     m_driver->setDigitalGain(m_params.dGain);
+    m_driver->setTemperatureCompensation(m_params.tempCorrect != 0);
     m_driver->setHighVoltage(m_params.highVoltage);
     m_driver->setPulseWidth(m_params.pulseWidth);
     m_driver->setPRF(m_params.prf);
@@ -940,10 +1117,16 @@ void ParamPage::onApplyLaw()
 // 参数序列化 / 反序列化
 // ═══════════════════════════════════════════════════════════
 
-static QJsonArray floatsToJson(const float *arr, int n)
+static double roundedJsonNumber(float value, int decimals)
+{
+    const double scale = std::pow(10.0, decimals);
+    return std::round(static_cast<double>(value) * scale) / scale;
+}
+
+static QJsonArray floatsToJson(const float *arr, int n, int decimals = 6)
 {
     QJsonArray a;
-    for (int i = 0; i < n; ++i) a.append(static_cast<double>(arr[i]));
+    for (int i = 0; i < n; ++i) a.append(roundedJsonNumber(arr[i], decimals));
     return a;
 }
 
@@ -966,6 +1149,43 @@ static void jsonToInts(const QJsonArray &a, int *arr, int n)
         arr[i] = a[i].toInt();
 }
 
+static QString enumText(int index, const QStringList &items)
+{
+    return index >= 0 && index < items.size() ? items[index] : QString::number(index);
+}
+
+static int enumIndex(const QJsonValue &value, const QStringList &items, int fallback)
+{
+    if (value.isDouble()) return value.toInt(fallback); // Legacy index format.
+    const int index = items.indexOf(value.toString());
+    return index >= 0 ? index : fallback;
+}
+
+static QJsonArray enumsToJson(const int *values, int count, const QStringList &items)
+{
+    QJsonArray result;
+    for (int i = 0; i < count; ++i) result.append(enumText(values[i], items));
+    return result;
+}
+
+static void jsonToEnums(const QJsonArray &array, int *values, int count,
+                        const QStringList &items)
+{
+    for (int i = 0; i < count && i < array.size(); ++i)
+        values[i] = enumIndex(array[i], items, values[i]);
+}
+
+static const QStringList &filterTexts()
+{
+    static const QStringList items = {
+        "0.5-20.0 MHz", "0.5-15.0 MHz", "0.5-10.0 MHz", "0.5-5.0 MHz",
+        "1.0-20.0 MHz", "3.0-20.0 MHz", "5.0-20.0 MHz", "7.0-20.0 MHz",
+        "10.0-20.0 MHz", "1.0 MHz", "2.5 MHz", "4.0 MHz",
+        "5.0 MHz", "7.5 MHz", "10.0 MHz", "15.0 MHz"
+    };
+    return items;
+}
+
 static QJsonArray shortsToJson(const short *arr, int n)
 {
     QJsonArray a;
@@ -985,79 +1205,81 @@ QJsonObject ParamPage::serializeParams() const
     QJsonObject j;
 
     // 发射
-    j["highVoltage"]   = p.highVoltage;
+    j["highVoltage"]   = enumText(p.highVoltage, {"110 V", "40 V", "20 V"});
     j["pulseWidth"]    = p.pulseWidth;
     j["prf"]           = p.prf;
-    j["range"]         = static_cast<double>(p.range);
-    j["tempCorrect"]   = p.tempCorrect;
-    j["aDataLen"]      = p.aDataLen;
+    j["range"]         = roundedJsonNumber(p.range, 1);
+    j["tempCorrect"]   = enumText(p.tempCorrect, {"关", "开"});
+    j["aDataLen"]      = enumText(p.aDataLen, {"100 点", "200 点", "400 点"});
 
     // 接收
-    j["aGain"]         = static_cast<double>(p.aGain);
-    j["dGain"]         = static_cast<double>(p.dGain);
+    j["aGain"]         = roundedJsonNumber(p.aGain, 1);
+    j["dGain"]         = roundedJsonNumber(p.dGain, 1);
     j["curBeam"]       = p.curBeam;
-    j["rectify"]       = p.rectify;
-    j["filter"]        = p.filter;
-    j["video"]         = p.video;
+    j["rectify"]       = enumText(p.rectify, {"全波", "正半波", "负半波"});
+    j["filter"]        = enumText(p.filter, filterTexts());
+    j["video"]         = enumText(p.video, {"无", "1", "2", "3", "4", "平滑"});
 
     // 闸门
-    j["gateSelect"]    = p.gateSelect;
-    j["gateStart"]     = floatsToJson(p.gateStart, 3);
-    j["gateWidth"]     = floatsToJson(p.gateWidth, 3);
-    j["gateThreshold"] = floatsToJson(p.gateThreshold, 3);
-    j["gateMeasure"]   = intsToJson(p.gateMeasure, 3);
-    j["alarmSound"]    = p.alarmSound;
+    j["gateSelect"]    = enumText(p.gateSelect, {"A 闸门", "B 闸门", "C 闸门"});
+    j["gateStart"]     = floatsToJson(p.gateStart, 3, 1);
+    j["gateWidth"]     = floatsToJson(p.gateWidth, 3, 1);
+    j["gateThreshold"] = floatsToJson(p.gateThreshold, 3, 1);
+    j["gateMeasure"]   = enumsToJson(p.gateMeasure, 3, {"峰值", "前沿"});
+    j["alarmSound"]    = enumText(p.alarmSound, {"关", "A 门", "B 门", "AB 门"});
 
     // 探头
-    j["probeType"]     = p.probeType;
-    j["probeFreq"]     = static_cast<double>(p.probeFreq);
+    j["probeType"]     = enumText(p.probeType, {"自定义", "2.5L16", "5.0S64"});
+    j["probeFreq"]     = roundedJsonNumber(p.probeFreq, 1);
     j["probeCount"]    = p.probeCount;
-    j["probePitch"]    = static_cast<double>(p.probePitch);
+    j["probePitch"]    = roundedJsonNumber(p.probePitch, 2);
 
     // 楔块
-    j["wedgeEnable"]   = p.wedgeEnable;
-    j["wedgeType"]     = p.wedgeType;
-    j["wedgeAngle"]    = static_cast<double>(p.wedgeAngle);
+    j["wedgeEnable"]   = enumText(p.wedgeEnable, {"否", "是"});
+    j["wedgeType"]     = enumText(p.wedgeType, {"自定义", "GW-PA"});
+    j["wedgeAngle"]    = roundedJsonNumber(p.wedgeAngle, 1);
     j["wedgeVelocity"] = p.wedgeVelocity;
-    j["wedgeHeight"]   = static_cast<double>(p.wedgeHeight);
+    j["wedgeHeight"]   = roundedJsonNumber(p.wedgeHeight, 1);
 
     // 工件
-    j["material"]      = p.material;
+    j["material"]      = enumText(p.material, {"钢纵波", "钢横波"});
     j["lVelocity"]     = p.lVelocity;
-    j["traceEnable"]   = p.traceEnable;
+    j["traceEnable"]   = enumText(p.traceEnable, {"否", "是"});
 
     // 扫查
-    j["scanType"]      = p.scanType;
+    j["scanType"]      = enumText(p.scanType, {"S 扫", "L 扫"});
     j["eleStart"]      = p.eleStart;
     j["eleEnd"]        = p.eleEnd;
     j["eleAperture"]   = p.eleAperture;
-    j["angleFrom"]     = static_cast<double>(p.angleFrom);
-    j["angleTo"]       = static_cast<double>(p.angleTo);
-    j["angle"]         = static_cast<double>(p.angle);
-    j["focus"]         = static_cast<double>(p.focus);
+    j["angleFrom"]     = roundedJsonNumber(p.angleFrom, 0);
+    j["angleTo"]       = roundedJsonNumber(p.angleTo, 0);
+    j["angle"]         = roundedJsonNumber(p.angle, 0);
+    j["focus"]         = roundedJsonNumber(p.focus, 1);
 
     // 成像 (C扫)
     j["imgLineX1"]     = p.imgLineX1;
     j["imgLineX2"]     = p.imgLineX2;
     j["imgLineY1"]     = p.imgLineY1;
     j["imgLineY2"]     = p.imgLineY2;
-    j["degPerPoint"]   = static_cast<double>(p.degPerPoint);
+    j["degPerPoint"]   = roundedJsonNumber(p.degPerPoint, 1);
 
     // 编码器
-    j["direction"]     = p.direction;
-    j["coderDeg"]      = static_cast<double>(p.coderDeg);
-    j["checkDistance"] = static_cast<double>(p.checkDistance);
+    j["direction"]     = enumText(p.direction, {"正向", "反向"});
+    j["coderDeg"]      = roundedJsonNumber(p.coderDeg, 3);
+    j["checkDistance"] = roundedJsonNumber(p.checkDistance, 1);
 
     // 校准 (TCG)
-    j["calibItem"]     = p.calibItem;
-    j["realDistance"]  = static_cast<double>(p.realDistance);
-    j["beamDelay"]     = static_cast<double>(p.beamDelay);
-    j["tcgCoeff"]      = static_cast<double>(p.tcgCoeff);
-    j["calibEnable"]   = p.calibEnable;
+    j["calibItem"]     = enumText(p.calibItem, {"声速", "声束延迟", "ACG", "TCG"});
+    j["realDistance"]  = roundedJsonNumber(p.realDistance, 1);
+    j["beamDelay"]     = roundedJsonNumber(p.beamDelay, 1);
+    j["tcgCoeff"]      = roundedJsonNumber(p.tcgCoeff, 3);
+    j["calibEnable"]   = enumText(p.calibEnable, {"关闭", "ACG"});
     j["tcgStart"]      = p.tcgStart;
     j["tcgEnd"]        = p.tcgEnd;
-    j["acgSwitch"]     = p.acgSwitch;
-    j["tcgSwitch"]     = p.tcgSwitch;
+    j["acgSwitch"]     = enumText(p.acgSwitch, {"关", "开"});
+    j["tcgSwitch"]     = enumText(p.tcgSwitch, {"关", "开"});
+    j["tcgX"]          = floatsToJson(p.tcgX, 6);
+    j["tcgRatio"]      = floatsToJson(p.tcgRatio, 6);
     j["acgValue"]      = floatsToJson(p.acgValue, 128);
     j["tcgPointX"]     = shortsToJson(reinterpret_cast<const short*>(p.tcgPointX), 10 * 128);
     j["tcgPointValue"] = floatsToJson(reinterpret_cast<const float*>(p.tcgPointValue), 10 * 128);
@@ -1069,20 +1291,20 @@ QJsonObject ParamPage::serializeParams() const
     j["diameter"]      = p.diameter;
 
     // 闸门独立报警/跟踪
-    j["gateAlarm"]     = intsToJson(p.gateAlarm, 3);
-    j["gateTrace"]     = intsToJson(p.gateTrace, 3);
+    j["gateAlarm"]     = enumsToJson(p.gateAlarm, 3, {"关", "开"});
+    j["gateTrace"]     = enumsToJson(p.gateTrace, 3, {"关", "开"});
 
     // 探头延迟
-    j["probeDelay"]    = static_cast<double>(p.probeDelay);
+    j["probeDelay"]    = roundedJsonNumber(p.probeDelay, 3);
 
     // TFM
-    j["dimX"]          = static_cast<double>(p.dimX);
-    j["dimY"]          = static_cast<double>(p.dimY);
-    j["offsetX"]       = static_cast<double>(p.offsetX);
-    j["offsetY"]       = static_cast<double>(p.offsetY);
-    j["pixelSize"]     = static_cast<double>(p.pixelSize);
-    j["pieceThickness"] = static_cast<double>(p.pieceThickness);
-    j["tfmDGain"]      = static_cast<double>(p.tfmDGain);
+    j["dimX"]          = roundedJsonNumber(p.dimX, 3);
+    j["dimY"]          = roundedJsonNumber(p.dimY, 3);
+    j["offsetX"]       = roundedJsonNumber(p.offsetX, 3);
+    j["offsetY"]       = roundedJsonNumber(p.offsetY, 3);
+    j["pixelSize"]     = roundedJsonNumber(p.pixelSize, 3);
+    j["pieceThickness"] = roundedJsonNumber(p.pieceThickness, 3);
+    j["tfmDGain"]      = roundedJsonNumber(p.tfmDGain, 3);
     j["tfmSmooth"]     = p.tfmSmooth;
     j["parRestrainH16"] = p.parRestrainH16;
     j["parRestrainL16"] = p.parRestrainL16;
@@ -1091,8 +1313,8 @@ QJsonObject ParamPage::serializeParams() const
     j["circleDeg"]     = p.circleDeg;
 
     // 成像扫描范围
-    j["imgSpanStart"]  = static_cast<double>(p.imgSpanStart);
-    j["imgSpanEnd"]    = static_cast<double>(p.imgSpanEnd);
+    j["imgSpanStart"]  = roundedJsonNumber(p.imgSpanStart, 3);
+    j["imgSpanEnd"]    = roundedJsonNumber(p.imgSpanEnd, 3);
 
     // 全局状态
     j["readNum"]       = p.readNum;
@@ -1115,6 +1337,93 @@ QJsonObject ParamPage::serializeParams() const
             j["beams"] = beamArr;
     }
 
+    // Keep the file valid JSON while documenting every persisted parameter.
+    // Older PA versions ignore this object, so annotated files remain compatible.
+    QJsonObject comments;
+    comments["highVoltage"] = "发射电压档位";
+    comments["pulseWidth"] = "发射脉冲宽度";
+    comments["prf"] = "脉冲重复频率";
+    comments["range"] = "A扫检测范围";
+    comments["tempCorrect"] = "温度补偿开关";
+    comments["aDataLen"] = "A扫数据长度";
+    comments["aGain"] = "模拟增益";
+    comments["dGain"] = "数字增益";
+    comments["curBeam"] = "当前声束编号";
+    comments["rectify"] = "检波方式";
+    comments["filter"] = "滤波档位";
+    comments["video"] = "视频滤波开关";
+    comments["gateSelect"] = "当前选中的闸门，0=A、1=B、2=C";
+    comments["gateStart"] = "A/B/C闸门起始位置数组";
+    comments["gateWidth"] = "A/B/C闸门宽度数组";
+    comments["gateThreshold"] = "A/B/C闸门阈值数组";
+    comments["gateMeasure"] = "A/B/C闸门测量方式数组";
+    comments["gateAlarm"] = "A/B/C闸门报警方式数组";
+    comments["gateTrace"] = "A/B/C闸门跟踪方式数组";
+    comments["alarmSound"] = "报警声音开关";
+    comments["probeType"] = "探头类型";
+    comments["probeFreq"] = "探头中心频率";
+    comments["probeCount"] = "探头阵元数量";
+    comments["probePitch"] = "探头阵元间距";
+    comments["probeDelay"] = "探头延迟";
+    comments["wedgeEnable"] = "楔块启用开关";
+    comments["wedgeType"] = "楔块类型";
+    comments["wedgeAngle"] = "楔块角度";
+    comments["wedgeVelocity"] = "楔块声速";
+    comments["wedgeHeight"] = "楔块高度";
+    comments["material"] = "工件材料类型";
+    comments["lVelocity"] = "工件纵波声速";
+    comments["sVelocity"] = "工件横波声速";
+    comments["diameter"] = "工件直径";
+    comments["traceEnable"] = "轨迹显示开关";
+    comments["scanType"] = "扫描类型";
+    comments["eleStart"] = "起始阵元";
+    comments["eleEnd"] = "结束阵元";
+    comments["eleAperture"] = "有效孔径阵元数";
+    comments["angleFrom"] = "扫描起始角度";
+    comments["angleTo"] = "扫描终止角度";
+    comments["angle"] = "固定扫描角度";
+    comments["focus"] = "聚焦深度";
+    comments["imgLineX1"] = "C扫成像X方向起始线";
+    comments["imgLineX2"] = "C扫成像X方向终止线";
+    comments["imgLineY1"] = "C扫成像Y方向起始线";
+    comments["imgLineY2"] = "C扫成像Y方向终止线";
+    comments["degPerPoint"] = "C扫每采样点对应角度";
+    comments["imgSpanStart"] = "C扫成像跨度起点";
+    comments["imgSpanEnd"] = "C扫成像跨度终点";
+    comments["direction"] = "编码器运动方向";
+    comments["coderDeg"] = "编码器每点角度";
+    comments["checkDistance"] = "检测距离";
+    comments["circleDeg"] = "编码器一周计数";
+    comments["calibItem"] = "当前校准项目";
+    comments["realDistance"] = "校准实际距离";
+    comments["beamDelay"] = "声束延迟";
+    comments["tcgCoeff"] = "TCG补偿系数";
+    comments["calibEnable"] = "校准启用开关";
+    comments["tcgStart"] = "TCG起始点";
+    comments["tcgEnd"] = "TCG终止点";
+    comments["acgSwitch"] = "ACG开关";
+    comments["tcgSwitch"] = "TCG开关";
+    comments["tcgX"] = "TCG控制点位置数组";
+    comments["tcgRatio"] = "TCG控制点增益比例数组";
+    comments["acgValue"] = "各声束ACG值数组";
+    comments["tcgPointX"] = "各声束TCG点位置数组";
+    comments["tcgPointValue"] = "各声束TCG点增益数组";
+    comments["dimX"] = "TFM成像X尺寸";
+    comments["dimY"] = "TFM成像Y尺寸";
+    comments["offsetX"] = "TFM成像X偏移";
+    comments["offsetY"] = "TFM成像Y偏移";
+    comments["pixelSize"] = "TFM像素尺寸";
+    comments["pieceThickness"] = "工件厚度";
+    comments["tfmDGain"] = "TFM数字增益";
+    comments["tfmSmooth"] = "TFM平滑参数";
+    comments["parRestrainH16"] = "TFM高16位抑制参数";
+    comments["parRestrainL16"] = "TFM低16位抑制参数";
+    comments["readNum"] = "全局读取序号";
+    comments["beamCount"] = "有效声束数量";
+    comments["tempBeamCount"] = "临时声束数量";
+    comments["beams"] = "非零声束几何描述，i为编号，x0/y0和x1/y1为端点";
+    j["_comments"] = comments;
+
     return j;
 }
 
@@ -1123,49 +1432,49 @@ void ParamPage::deserializeParams(const QJsonObject &j)
     auto &p = m_params;
 
     // 发射
-    if (j.contains("highVoltage"))   p.highVoltage   = j["highVoltage"].toInt();
+    if (j.contains("highVoltage"))   p.highVoltage   = enumIndex(j["highVoltage"], {"110 V", "40 V", "20 V"}, p.highVoltage);
     if (j.contains("pulseWidth"))    p.pulseWidth    = j["pulseWidth"].toInt();
     if (j.contains("prf"))           p.prf           = j["prf"].toInt();
     if (j.contains("range"))         p.range         = static_cast<float>(j["range"].toDouble());
-    if (j.contains("tempCorrect"))   p.tempCorrect   = j["tempCorrect"].toInt();
-    if (j.contains("aDataLen"))      p.aDataLen      = j["aDataLen"].toInt();
+    if (j.contains("tempCorrect"))   p.tempCorrect   = enumIndex(j["tempCorrect"], {"关", "开"}, p.tempCorrect);
+    if (j.contains("aDataLen"))      p.aDataLen      = enumIndex(j["aDataLen"], {"100 点", "200 点", "400 点"}, p.aDataLen);
 
     // 接收
     if (j.contains("aGain"))         p.aGain         = static_cast<float>(j["aGain"].toDouble());
     if (j.contains("dGain"))         p.dGain         = static_cast<float>(j["dGain"].toDouble());
     if (j.contains("curBeam"))       p.curBeam       = j["curBeam"].toInt();
-    if (j.contains("rectify"))       p.rectify       = j["rectify"].toInt();
-    if (j.contains("filter"))        p.filter        = j["filter"].toInt();
-    if (j.contains("video"))         p.video         = j["video"].toInt();
+    if (j.contains("rectify"))       p.rectify       = enumIndex(j["rectify"], {"全波", "正半波", "负半波"}, p.rectify);
+    if (j.contains("filter"))        p.filter        = enumIndex(j["filter"], filterTexts(), p.filter);
+    if (j.contains("video"))         p.video         = enumIndex(j["video"], {"无", "1", "2", "3", "4", "平滑"}, p.video);
 
     // 闸门
-    if (j.contains("gateSelect"))    p.gateSelect    = j["gateSelect"].toInt();
+    if (j.contains("gateSelect"))    p.gateSelect    = enumIndex(j["gateSelect"], {"A 闸门", "B 闸门", "C 闸门"}, p.gateSelect);
     if (j.contains("gateStart"))     jsonToFloats(j["gateStart"].toArray(), p.gateStart, 3);
     if (j.contains("gateWidth"))     jsonToFloats(j["gateWidth"].toArray(), p.gateWidth, 3);
     if (j.contains("gateThreshold")) jsonToFloats(j["gateThreshold"].toArray(), p.gateThreshold, 3);
-    if (j.contains("gateMeasure"))   jsonToInts(j["gateMeasure"].toArray(), p.gateMeasure, 3);
-    if (j.contains("alarmSound"))    p.alarmSound    = j["alarmSound"].toInt();
+    if (j.contains("gateMeasure"))   jsonToEnums(j["gateMeasure"].toArray(), p.gateMeasure, 3, {"峰值", "前沿"});
+    if (j.contains("alarmSound"))    p.alarmSound    = enumIndex(j["alarmSound"], {"关", "A 门", "B 门", "AB 门"}, p.alarmSound);
 
     // 探头
-    if (j.contains("probeType"))     p.probeType     = j["probeType"].toInt();
+    if (j.contains("probeType"))     p.probeType     = enumIndex(j["probeType"], {"自定义", "2.5L16", "5.0S64"}, p.probeType);
     if (j.contains("probeFreq"))     p.probeFreq     = static_cast<float>(j["probeFreq"].toDouble());
     if (j.contains("probeCount"))    p.probeCount    = j["probeCount"].toInt();
     if (j.contains("probePitch"))    p.probePitch    = static_cast<float>(j["probePitch"].toDouble());
 
     // 楔块
-    if (j.contains("wedgeEnable"))   p.wedgeEnable   = j["wedgeEnable"].toInt();
-    if (j.contains("wedgeType"))     p.wedgeType     = j["wedgeType"].toInt();
+    if (j.contains("wedgeEnable"))   p.wedgeEnable   = enumIndex(j["wedgeEnable"], {"否", "是"}, p.wedgeEnable);
+    if (j.contains("wedgeType"))     p.wedgeType     = enumIndex(j["wedgeType"], {"自定义", "GW-PA"}, p.wedgeType);
     if (j.contains("wedgeAngle"))    p.wedgeAngle    = static_cast<float>(j["wedgeAngle"].toDouble());
     if (j.contains("wedgeVelocity")) p.wedgeVelocity = j["wedgeVelocity"].toInt();
     if (j.contains("wedgeHeight"))   p.wedgeHeight   = static_cast<float>(j["wedgeHeight"].toDouble());
 
     // 工件
-    if (j.contains("material"))      p.material      = j["material"].toInt();
+    if (j.contains("material"))      p.material      = enumIndex(j["material"], {"钢纵波", "钢横波"}, p.material);
     if (j.contains("lVelocity"))     p.lVelocity     = j["lVelocity"].toInt();
-    if (j.contains("traceEnable"))   p.traceEnable   = j["traceEnable"].toInt();
+    if (j.contains("traceEnable"))   p.traceEnable   = enumIndex(j["traceEnable"], {"否", "是"}, p.traceEnable);
 
     // 扫查
-    if (j.contains("scanType"))      p.scanType      = j["scanType"].toInt();
+    if (j.contains("scanType"))      p.scanType      = enumIndex(j["scanType"], {"S 扫", "L 扫"}, p.scanType);
     if (j.contains("eleStart"))      p.eleStart      = j["eleStart"].toInt();
     if (j.contains("eleEnd"))        p.eleEnd        = j["eleEnd"].toInt();
     if (j.contains("eleAperture"))   p.eleAperture   = j["eleAperture"].toInt();
@@ -1182,20 +1491,22 @@ void ParamPage::deserializeParams(const QJsonObject &j)
     if (j.contains("degPerPoint"))   p.degPerPoint   = static_cast<float>(j["degPerPoint"].toDouble());
 
     // 编码器
-    if (j.contains("direction"))     p.direction     = j["direction"].toInt();
+    if (j.contains("direction"))     p.direction     = enumIndex(j["direction"], {"正向", "反向"}, p.direction);
     if (j.contains("coderDeg"))      p.coderDeg      = static_cast<float>(j["coderDeg"].toDouble());
     if (j.contains("checkDistance")) p.checkDistance = static_cast<float>(j["checkDistance"].toDouble());
 
     // 校准
-    if (j.contains("calibItem"))     p.calibItem     = j["calibItem"].toInt();
+    if (j.contains("calibItem"))     p.calibItem     = enumIndex(j["calibItem"], {"声速", "声束延迟", "ACG", "TCG"}, p.calibItem);
     if (j.contains("realDistance"))  p.realDistance  = static_cast<float>(j["realDistance"].toDouble());
     if (j.contains("beamDelay"))     p.beamDelay     = static_cast<float>(j["beamDelay"].toDouble());
     if (j.contains("tcgCoeff"))      p.tcgCoeff      = static_cast<float>(j["tcgCoeff"].toDouble());
-    if (j.contains("calibEnable"))   p.calibEnable   = j["calibEnable"].toInt();
+    if (j.contains("calibEnable"))   p.calibEnable   = enumIndex(j["calibEnable"], {"关闭", "ACG"}, p.calibEnable);
     if (j.contains("tcgStart"))      p.tcgStart      = j["tcgStart"].toInt();
     if (j.contains("tcgEnd"))        p.tcgEnd        = j["tcgEnd"].toInt();
-    if (j.contains("acgSwitch"))     p.acgSwitch     = j["acgSwitch"].toInt();
-    if (j.contains("tcgSwitch"))     p.tcgSwitch     = j["tcgSwitch"].toInt();
+    if (j.contains("acgSwitch"))     p.acgSwitch     = enumIndex(j["acgSwitch"], {"关", "开"}, p.acgSwitch);
+    if (j.contains("tcgSwitch"))     p.tcgSwitch     = enumIndex(j["tcgSwitch"], {"关", "开"}, p.tcgSwitch);
+    if (j.contains("tcgX"))          jsonToFloats(j["tcgX"].toArray(), p.tcgX, 6);
+    if (j.contains("tcgRatio"))      jsonToFloats(j["tcgRatio"].toArray(), p.tcgRatio, 6);
     if (j.contains("acgValue"))      jsonToFloats(j["acgValue"].toArray(), p.acgValue, 128);
     if (j.contains("tcgPointX"))     jsonToShorts(j["tcgPointX"].toArray(), reinterpret_cast<short*>(p.tcgPointX), 10 * 128);
     if (j.contains("tcgPointValue")) jsonToFloats(j["tcgPointValue"].toArray(), reinterpret_cast<float*>(p.tcgPointValue), 10 * 128);
@@ -1203,8 +1514,8 @@ void ParamPage::deserializeParams(const QJsonObject &j)
     // ── MFC 补齐字段 ──
     if (j.contains("sVelocity"))     p.sVelocity     = j["sVelocity"].toInt();
     if (j.contains("diameter"))      p.diameter      = j["diameter"].toInt();
-    if (j.contains("gateAlarm"))     jsonToInts(j["gateAlarm"].toArray(), p.gateAlarm, 3);
-    if (j.contains("gateTrace"))     jsonToInts(j["gateTrace"].toArray(), p.gateTrace, 3);
+    if (j.contains("gateAlarm"))     jsonToEnums(j["gateAlarm"].toArray(), p.gateAlarm, 3, {"关", "开"});
+    if (j.contains("gateTrace"))     jsonToEnums(j["gateTrace"].toArray(), p.gateTrace, 3, {"关", "开"});
     if (j.contains("probeDelay"))    p.probeDelay    = static_cast<float>(j["probeDelay"].toDouble());
     if (j.contains("dimX"))          p.dimX          = static_cast<float>(j["dimX"].toDouble());
     if (j.contains("dimY"))          p.dimY          = static_cast<float>(j["dimY"].toDouble());
@@ -1263,19 +1574,21 @@ void ParamPage::syncUiFromParams()
     QSignalBlocker bf(m_gateWidthSpin);
     QSignalBlocker bg(m_gateThreshSpin);
     QSignalBlocker bh(m_gateMeasureCombo);
-    QSignalBlocker bi(m_alarmCombo);
-    QSignalBlocker bj(m_probeTypeCombo);
-    QSignalBlocker bk(m_probeFreqSpin);
-    QSignalBlocker bl(m_probeCountSpin);
-    QSignalBlocker bm(m_probePitchSpin);
-    QSignalBlocker bn(m_wedgeEnableCombo);
-    QSignalBlocker bo(m_wedgeTypeCombo);
-    QSignalBlocker bp(m_wedgeAngleSpin);
-    QSignalBlocker bq(m_wedgeVelSpin);
-    QSignalBlocker br(m_wedgeHeightSpin);
-    QSignalBlocker bs(m_materialCombo);
-    QSignalBlocker bt(m_lVelSpin);
-    QSignalBlocker bu(m_traceEnableCombo);
+    QSignalBlocker bi(m_gateAlarmCombo);
+    QSignalBlocker bj(m_gateTraceCombo);
+    QSignalBlocker bk(m_alarmSoundCombo);
+    QSignalBlocker bl(m_probeTypeCombo);
+    QSignalBlocker bm(m_probeFreqSpin);
+    QSignalBlocker bn(m_probeCountSpin);
+    QSignalBlocker bo(m_probePitchSpin);
+    QSignalBlocker bp(m_wedgeEnableCombo);
+    QSignalBlocker bq(m_wedgeTypeCombo);
+    QSignalBlocker br(m_wedgeAngleSpin);
+    QSignalBlocker bs(m_wedgeVelSpin);
+    QSignalBlocker bt(m_wedgeHeightSpin);
+    QSignalBlocker bu(m_materialCombo);
+    QSignalBlocker bv(m_lVelSpin);
+    QSignalBlocker bw(m_traceEnableCombo);
 
     // ── 发射 ──
     m_voltCombo->setCurrentIndex(p.highVoltage);
@@ -1299,7 +1612,9 @@ void ParamPage::syncUiFromParams()
     m_gateWidthSpin->setValue(static_cast<double>(p.gateWidth[p.gateSelect]));
     m_gateThreshSpin->setValue(static_cast<double>(p.gateThreshold[p.gateSelect]));
     m_gateMeasureCombo->setCurrentIndex(p.gateMeasure[p.gateSelect]);
-    m_alarmCombo->setCurrentIndex(p.alarmSound);
+    m_gateAlarmCombo->setCurrentIndex(p.gateAlarm[p.gateSelect]);
+    m_gateTraceCombo->setCurrentIndex(p.gateTrace[p.gateSelect]);
+    m_alarmSoundCombo->setCurrentIndex(p.alarmSound);
 
     // ── 探头 ──
     m_probeTypeCombo->setCurrentIndex(p.probeType);
@@ -1335,12 +1650,56 @@ void ParamPage::syncUiFromParams()
 static QString paramsDir()  { QString d = QCoreApplication::applicationDirPath() + "/params";  QDir().mkpath(d); return d; }
 static QString dataDir()    { QString d = QCoreApplication::applicationDirPath() + "/data";    QDir().mkpath(d); return d; }
 
+bool ParamPage::initializeParams()
+{
+    const QString path = paramsDir() + "/default.json";
+    QFile file(path);
+
+    if (file.exists()) {
+        if (!file.open(QIODevice::ReadOnly))
+            return false;
+
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject())
+            return false;
+
+        deserializeParams(document.object());
+        syncUiFromParams();
+        return true;
+    }
+
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+
+    file.write(QJsonDocument(serializeParams()).toJson(QJsonDocument::Indented));
+    return file.error() == QFile::NoError;
+}
+
+void ParamPage::applyCurrentParams()
+{
+    onApplyLaw();
+}
+
 void ParamPage::onSaveParams()
 {
+    // Commit the visible gate editor before serializing all three gate records.
+    const int gate = qBound(0, m_params.gateSelect, 2);
+    m_params.gateStart[gate] = static_cast<float>(m_gateStartSpin->value());
+    m_params.gateWidth[gate] = static_cast<float>(m_gateWidthSpin->value());
+    m_params.gateThreshold[gate] = static_cast<float>(m_gateThreshSpin->value());
+    m_params.gateMeasure[gate] = m_gateMeasureCombo->currentIndex();
+    m_params.gateAlarm[gate] = m_gateAlarmCombo->currentIndex();
+    m_params.gateTrace[gate] = m_gateTraceCombo->currentIndex();
+
     QString path = QFileDialog::getSaveFileName(
         this, "保存参数", paramsDir(),
-        "参数文件 (*.json);;所有文件 (*)");
+        "参数文件 (*.json);;MFC参数文件 (*.par);;所有文件 (*)");
     if (path.isEmpty()) return;
+    if (path.endsWith(".par", Qt::CaseInsensitive)) {
+        emit legacyParamsSaveRequested(path);
+        return;
+    }
 
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly)) return;
@@ -1353,8 +1712,12 @@ void ParamPage::onLoadParams()
 {
     QString path = QFileDialog::getOpenFileName(
         this, "调用参数", paramsDir(),
-        "参数文件 (*.json *.ini *.param);;所有文件 (*)");
+        "参数文件 (*.json *.ini *.param);;MFC参数文件 (*.par);;所有文件 (*)");
     if (path.isEmpty()) return;
+    if (path.endsWith(".par", Qt::CaseInsensitive)) {
+        emit legacyParamsLoadRequested(path);
+        return;
+    }
 
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) return;
@@ -1366,6 +1729,8 @@ void ParamPage::onLoadParams()
 
     deserializeParams(doc.object());
     syncUiFromParams();
+    if (m_driver && m_driver->isConnected())
+        applyCurrentParams();
 
     // 加载后自动展开参数面板，确保用户能看到更新后的值
     if (!m_stack->isVisible()) {
@@ -1392,11 +1757,16 @@ void ParamPage::updateCScanButtons()
 
 void ParamPage::onSaveData()
 {
+    QString selectedFilter;
     QString path = QFileDialog::getSaveFileName(
         this, "保存C扫数据", dataDir(),
-        "C扫数据 (*.dat);;所有文件 (*)");
+        "PA数据 (*.dat);;MFC兼容数据 (*.dat);;MFC CSV数据 (*.csv);;所有文件 (*)",
+        &selectedFilter);
     if (path.isEmpty()) return;
-    emit saveDataRequested(path);
+    if (selectedFilter.startsWith("MFC兼容数据"))
+        emit saveLegacyDataRequested(path);
+    else
+        emit saveDataRequested(path);
 }
 
 void ParamPage::onReplayData()
@@ -1497,8 +1867,9 @@ void ParamPage::setupUi()
     // ── 右侧内容区 ──
     m_stack = new QStackedWidget;
     m_stack->setObjectName("ParamStack");
-    m_stack->setFixedWidth(kStackWidth);
-    m_stack->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    m_stack->setMinimumWidth(0);
+    m_stack->setMaximumWidth(kStackWidth);
+    m_stack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     // 构建所有页面（索引 0-10 对应导航 11 项）
     buildTransmitPage();    // 0 发射

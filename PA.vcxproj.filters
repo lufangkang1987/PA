@@ -46,13 +46,13 @@
     <ClCompile Include="Ultrasonic\CTSPA22SDriver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Ultrasonic\CScanEngine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Pages\HomePage\HomePage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Pages\ParamPage\ParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\CScanPage\CScanPage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp">
@@ -75,6 +75,9 @@
     <QtMoc Include="Ultrasonic\CTSPA22SDriver.h">
       <Filter>Header Files</Filter>
     </QtMoc>
+    <QtMoc Include="Ultrasonic\CScanEngine.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
     <QtMoc Include="Pages\HomePage\HomePage.h">
       <Filter>Header Files</Filter>
     </QtMoc>
@@ -82,9 +85,6 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\ParamPage.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="Pages\CScanPage\CScanPage.h">
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="Pages\MeasurePage\MeasurePage.h">
@@ -101,28 +101,11 @@
     <ClInclude Include="Ultrasonic\DataTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Ultrasonic\LegacyMfcData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Ultrasonic\PAParams.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ui_HomePage.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ui_MainWindow.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ui_ParamPage.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <QtUic Include="Pages\HomePage\HomePage.ui">
-      <Filter>Form Files</Filter>
-    </QtUic>
-    <QtUic Include="Pages\ParamPage\ParamPage.ui">
-      <Filter>Form Files</Filter>
-    </QtUic>
-    <QtUic Include="MainWindow\MainWindow.ui">
-      <Filter>Form Files</Filter>
-    </QtUic>
   </ItemGroup>
 </Project>

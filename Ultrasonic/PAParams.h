@@ -33,7 +33,7 @@ struct PAParams
     float gateWidth[3]   = {4.0f, 3.0f, 3.0f};
     float gateThreshold[3] = {40.0f, 30.0f, 30.0f};
     int   gateMeasure[3] = {0, 0, 0};   // 0=峰值 1=前沿
-    int   gateAlarm[3]   = {0, 0, 0};   // 0=关 1=开 (A/B/C 独立报警)
+    int   gateAlarm[3]   = {1, 1, 1};   // 0=关 1=开 (A/B/C 独立报警，默认全开与MFC一致)
     int   gateTrace[3]   = {0, 0, 0};   // 0=关 1=开 (A/B/C 独立跟踪)
     int   alarmSound     = 0;     // 0=关 1=A门 2=B门 3=AB门
 

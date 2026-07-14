@@ -14,7 +14,8 @@ public:
     explicit MeasurePage(QWidget *parent = nullptr);
 
     // ========= 读数更新接口 =========
-    void updateGateReadings(char gate, double amp, double path);
+    void updateGateReadings(char gate, double amplitudePercent, double soundPathMm,
+                            double angleDegrees, double horizontalOffsetMm = 0.0);
     void updateBeamInfo(int beamNo, double gain);
 
     // ========= 冻结控制 =========

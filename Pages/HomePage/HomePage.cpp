@@ -5,10 +5,13 @@
 #include "IDriver.h"
 #include "CTSPA22SDriver.h"
 #include "AppState.h"
+#include "PAParams.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
 #include <QFrame>
+#include <QCoreApplication>
+#include <QDir>
 #include <QLabel>
 #include <QTimer>
 
@@ -174,6 +177,18 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 	m_aScan = new AScanWidget;
 	m_bScan = new BScanWidget;
 	m_cScan = new CScanWidget;
+	connect(m_cScan, &CScanWidget::positionSelected,
+	        this, &HomePage::cScanPositionSelected);
+	connect(m_cScan, &CScanWidget::analysisRectChanged,
+	        this, &HomePage::cScanAnalysisRectChanged);
+	connect(m_cScan, &CScanWidget::analysisMeasured, this,
+	        [this](float maximum, float average, int maxLine, int maxColumn) {
+		m_analysisStatus->setFullText(QString("Analysis: max %1%, avg %2%, pos (%3, %4)")
+		    .arg(maximum * 100.0f, 0, 'f', 1).arg(average * 100.0f, 0, 'f', 1)
+		    .arg(maxLine * m_cScan->property("scanStepMm").toFloat(), 0, 'f', 1)
+		    .arg(maxColumn));
+		emit cScanAnalysisMeasured(maximum, average, maxLine, maxColumn);
+	});
 
 	// ── 默认闸门参数 ──
 	setGateParams(0, true,  2.5f, 4.0f, 40.0f, QColor(255, 30, 30));
@@ -192,19 +207,34 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 	// ── 底部状态栏 ──
 	auto* statusBar = new QFrame;
 	statusBar->setObjectName("BottomStatus");
-	statusBar->setMinimumHeight(36);
-	statusBar->setMaximumHeight(42);
+	statusBar->setMinimumHeight(28);
+	statusBar->setMaximumHeight(36);
 	auto* statusLayout = new QHBoxLayout(statusBar);
-	statusLayout->setContentsMargins(12, 0, 12, 0);
-	statusLayout->setSpacing(10);
-	statusLayout->addWidget(statusItem("设备状态", "正常", true));
-	statusLayout->addWidget(statusItem("探头连接", "正常", true));
-	statusLayout->addWidget(statusItem("编码器", "正常", true));
-	statusLayout->addWidget(statusItem("扫描长度", "1250.00 mm"));
-	statusLayout->addWidget(statusItem("已扫长度", "320.00 mm"));
-	statusLayout->addWidget(statusItem("完成进度", "25%"));
+	statusLayout->setContentsMargins(12, 2, 12, 2);
+	statusLayout->setSpacing(16);
+	m_scanLengthStatus = statusItem("扫描长度", "0.00 mm");
+	m_scannedLengthStatus = statusItem("已扫长度", "0.00 mm");
+	m_progressStatus = statusItem("完成进度", "0%");
+	m_speedStatus = statusItem("速度", "0.0 mm/s");
+	m_analysisStatus = statusItem("分析", "--");
+	m_frameDiffStatus = statusItem("帧差", "0");
+	m_droppedFrameStatus = statusItem("漏帧", "0");
+	statusLayout->addWidget(m_scanLengthStatus);
+	statusLayout->addWidget(m_scannedLengthStatus);
+	statusLayout->addWidget(m_progressStatus);
+	statusLayout->addWidget(m_speedStatus);
+	statusLayout->addWidget(m_analysisStatus);
+	statusLayout->addWidget(m_frameDiffStatus);
+	statusLayout->addWidget(m_droppedFrameStatus);
 	statusLayout->addStretch();
-	statusLayout->addWidget(statusItem("数据路径", "D:\\TOFD\\Data\\"));
+		{
+			const QString dataDir = QCoreApplication::applicationDirPath() + "/data";
+			auto* pathItem = new ElidedLabel(QString::fromUtf8("数据: %1").arg(QDir::toNativeSeparators(dataDir)));
+			pathItem->setObjectName("StatusItem");
+			pathItem->setMinimumWidth(0);
+			pathItem->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+			statusLayout->addWidget(pathItem);
+		}
 
 	root->addLayout(grid, 1);
 	root->addWidget(statusBar);
@@ -252,6 +282,8 @@ void HomePage::setDriver(IDriver* driver)
 		connect(ct, &CTSPA22SDriver::statusChanged, this, [this](const QString& s) {
 			m_status->setText(QString::fromUtf8("系统状态：") + s);
 		});
+		connect(ct, &CTSPA22SDriver::frameStatisticsChanged,
+		        this, &HomePage::updateFrameStatistics);
 		connect(ct, &CTSPA22SDriver::multiBeamWaveformsReady, this, [this](const QVector<QVector<double>> &waves) {
 			m_bScan->setMultiBeamData(waves, /*isRF*/ false);
 			bool alarm = false;
@@ -307,6 +339,12 @@ void HomePage::setFrozen(bool frozen)
         m_bScan->setFrozen(frozen);
 }
 
+void HomePage::setAScanCalibrationGuide(bool visible, int targetPercent)
+{
+    if (m_aScan)
+        m_aScan->setCalibrationGuide(visible, targetPercent);
+}
+
 QVector<float> HomePage::getCScanData(int &w, int &h) const
 {
     if (m_cScan) {
@@ -323,6 +361,7 @@ void HomePage::setCScanReplayData(const QVector<float> &data, int w, int h, bool
     if (m_cScan) {
         m_cScan->setData(data, w, h);
         m_cScan->setReplayMode(replayOn);
+        m_cScan->setPageStart(0);
     }
 }
 
@@ -330,4 +369,87 @@ void HomePage::setCScanReplayMode(bool on)
 {
     if (m_cScan)
         m_cScan->setReplayMode(on);
+}
+
+void HomePage::setCScanData(const QVector<float> &data, int w, int h)
+{
+    if (m_cScan) {
+        m_cScan->setReplayMode(false);
+        m_cScan->setData(data, w, h);
+        m_cScan->setPageStart(qMax(0, h - 925));
+    }
+}
+
+void HomePage::updateCScanMetrics(int lines, int totalLines, double scannedMm,
+                                  double speedMmPerSec, double averageMmPerSec)
+{
+    const double totalMm = totalLines > 0 && lines > 0
+        ? scannedMm * totalLines / lines : 0.0;
+    const int percent = totalLines > 0 ? qBound(0, lines * 100 / totalLines, 100) : 0;
+    m_scanLengthStatus->setFullText(QString("扫描长度：%1 mm").arg(totalMm, 0, 'f', 2));
+    m_scannedLengthStatus->setFullText(QString("已扫长度：%1 mm").arg(scannedMm, 0, 'f', 2));
+    m_progressStatus->setFullText(QString("完成进度：%1%").arg(percent));
+    m_speedStatus->setFullText(QString("速度：%1 mm/s (平均 %2)")
+        .arg(speedMmPerSec, 0, 'f', 1).arg(averageMmPerSec, 0, 'f', 1));
+}
+
+void HomePage::updateFrameStatistics(int frameDiff, quint64 droppedFrames)
+{
+    if (m_frameDiffStatus)
+        m_frameDiffStatus->setFullText(QString("帧差：%1").arg(frameDiff));
+    if (m_droppedFrameStatus)
+        m_droppedFrameStatus->setFullText(QString("漏帧：%1").arg(droppedFrames));
+}
+
+void HomePage::showReplayPacket(const DataPacket &packet, int line,
+                                int beamIndex, int rectifyMode)
+{
+    if (packet.beamCount <= 0) return;
+    const int beam = qBound(0, beamIndex, packet.beamCount - 1);
+    const bool isRf = rectifyMode == 3;
+    QVector<double> selected(WaveSampleCount);
+    QVector<QVector<double>> all(packet.beamCount);
+    for (int b = 0; b < packet.beamCount; ++b) {
+        all[b].resize(WaveSampleCount);
+        for (int i = 0; i < WaveSampleCount; ++i)
+            all[b][i] = isRf ? (int(packet.beams[b].waveP[i]) - 128) / 128.0
+                             : packet.beams[b].waveP[i] / 255.0;
+    }
+    selected = all[beam];
+    m_aScan->setWaveform(selected, beam, packet.frameIndex, rectifyMode);
+    m_bScan->setMultiBeamData(all, isRf);
+    m_cScan->setSelectedLine(line);
+}
+
+void HomePage::selectCScanLine(int line)
+{
+    m_cScan->setSelectedLine(line);
+}
+
+void HomePage::configureCScanView(const PAParams &params)
+{
+    if (!m_cScan) return;
+    m_cScan->setAnalysisRect(params.anaLineX1, params.anaLineX2,
+                             params.anaLineY1, params.anaLineY2);
+    m_cScan->setImageColumnRange(params.imgLineX1, params.imgLineX2);
+    m_cScan->setPhysicalScale(params.degPerPoint,
+                              params.imgSpanStart, params.imgSpanEnd);
+    m_cScan->setProperty("scanStepMm", params.degPerPoint);
+}
+
+void HomePage::setCScanImageSpan(float startMm, float endMm)
+{
+    if (!m_cScan || !m_cScan->hasData()) return;
+    m_cScan->setPhysicalScale(m_cScan->property("scanStepMm").toFloat(),
+                              startMm, endMm);
+}
+
+void HomePage::setCScanPageStart(int line)
+{
+    if (m_cScan) m_cScan->setPageStart(line);
+}
+
+int HomePage::cScanPageStart() const
+{
+    return m_cScan ? m_cScan->pageStart() : 0;
 }

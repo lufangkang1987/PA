@@ -159,6 +159,13 @@ CTSPA22SDriver::CTSPA22SDriver(QObject *parent)
 {
     m_cmdSocket  = new QTcpSocket(this);
     m_dataSocket = new QTcpSocket(this);
+    m_monitorTimer = new QTimer(this);
+    m_monitorTimer->setInterval(30000);
+    connect(m_monitorTimer, &QTimer::timeout, this, [this] {
+        if (!m_connected) return;
+        queryTemperature();
+        queryVoltage();
+    });
 
     // 命令通道信号
     connect(m_cmdSocket, &QTcpSocket::connected,
@@ -216,6 +223,13 @@ bool CTSPA22SDriver::connectDevice(const QString &ip,
     m_dataReady = true;
     m_connected = true;
     m_parser.reset();
+    m_lastCompTemp = -100;
+    m_monitorTimer->start();
+    QTimer::singleShot(0, this, [this] {
+        if (!m_connected) return;
+        queryTemperature();
+        queryVoltage();
+    });
 
     emit connectionChanged(true);
     emit statusChanged(QString("已连接 %1 (命令:%2 数据:%3)")
@@ -234,6 +248,7 @@ bool CTSPA22SDriver::connectDevice(ConnectionMode mode)
 
 void CTSPA22SDriver::disconnectDevice()
 {
+    m_monitorTimer->stop();
     stopAcquisition();
 
     if (m_dataSocket->state() != QAbstractSocket::UnconnectedState)
@@ -268,6 +283,11 @@ void CTSPA22SDriver::startAcquisition()
     // 下发扫查类型（触发硬件开始组帧），不等待命令响应
     // 因为 {"scan": 1} 后数据通道立即开始灌帧，
     // 命令通道可能不返回 JSON，等待会导致 3 秒 UI 冻结
+    m_hasLastWaveFrame = false;
+    m_lastReportedFrameDiff = -1;
+    m_droppedFrames = 0;
+    emit frameStatisticsChanged(0, 0);
+
     sendJsonCommand(buildScanTypeCommand(m_scanType), false);
 
     // 启动数据采集
@@ -314,6 +334,24 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
         DataPacket pkt = MTLDParser::parseWaveforms(frame.payload);
 
         if (pkt.beamCount < 1) return;
+
+        const quint16 currentFrame = pkt.beams[0].frame;
+        int frameDiff = 0;
+        if (m_hasLastWaveFrame) {
+            frameDiff = static_cast<quint16>(currentFrame - m_lastWaveFrame);
+            if (frameDiff > 32768)
+                frameDiff = 0;
+            if (frameDiff > 1)
+                m_droppedFrames += static_cast<quint64>(frameDiff - 1);
+        }
+        m_lastWaveFrame = currentFrame;
+        m_hasLastWaveFrame = true;
+        if (frameDiff != m_lastReportedFrameDiff || frameDiff > 1) {
+            emit frameStatisticsChanged(frameDiff, m_droppedFrames);
+            m_lastReportedFrameDiff = frameDiff;
+        }
+
+        emit dataPacketReady(pkt);
 
         // --- A 扫描：发送当前声束波形 ---
         {
@@ -583,6 +621,8 @@ QJsonObject CTSPA22SDriver::buildDGainCommand(float digitalGain)
 {
     // MFC 版: DGain + 36.0 + 温度补偿
     float dgain = digitalGain + 36.0f;
+    if (m_tempCorrect)
+        dgain += (m_xadcTemp - 30) * 0.03f;
     QJsonObject obj;
     obj["dgain"] = dgain;
     return obj;
@@ -646,7 +686,15 @@ void CTSPA22SDriver::setScanType(int type)
         stopAcquisition();
         QThread::msleep(200);
     }
-    sendJsonCommand(buildScanTypeCommand(type));
+    const QJsonObject response = sendJsonCommand(buildScanTypeCommand(type));
+    QJsonArray result = response.value("result").toArray();
+    if (!result.isEmpty()) {
+        QVector<double> positions;
+        positions.reserve(result.size());
+        for (const QJsonValue &value : result)
+            positions.append(value.toDouble());
+        emit scanRulePositionsReady(positions);
+    }
     if (m_acquiring)
         startAcquisition();
     emit statusChanged(QString("扫查类型: %1").arg(
@@ -663,6 +711,14 @@ void CTSPA22SDriver::setDigitalGain(float dB)
 {
     m_digitalGain = dB;
     sendJsonCommand(buildDGainCommand(dB));
+}
+
+void CTSPA22SDriver::setTemperatureCompensation(bool enabled)
+{
+    m_tempCorrect = enabled;
+    m_lastCompTemp = -100;
+    if (m_connected)
+        sendJsonCommand(buildDGainCommand(m_digitalGain));
 }
 
 void CTSPA22SDriver::setHighVoltage(int level)
@@ -772,8 +828,15 @@ void CTSPA22SDriver::queryTemperature()
 
     QJsonObject resp = sendJsonCommand(obj);  // 阻塞等响应
     if (resp.contains("result") && resp["result"].toObject().contains("temp")) {
-        double temp = resp["result"].toObject()["temp"].toDouble();
+        const double temp = qBound(-50.0,
+            resp["result"].toObject()["temp"].toDouble(), 100.0);
         emit temperatureReceived(temp);
+        m_xadcTemp = static_cast<int>(temp);
+        if (m_tempCorrect
+                && (m_lastCompTemp == -100 || qAbs(m_xadcTemp - m_lastCompTemp) >= 1)) {
+            sendJsonCommand(buildDGainCommand(m_digitalGain));
+            m_lastCompTemp = m_xadcTemp;
+        }
     }
 }
 
@@ -796,6 +859,56 @@ void CTSPA22SDriver::resetEncoder(int idx)
     QJsonObject obj;
     obj["encoder_reset"] = enc;
     sendJsonCommand(obj);
+}
+
+void CTSPA22SDriver::setACG(bool enabled, const PAParams &params)
+{
+    QJsonObject obj;
+    if (!enabled) {
+        obj["bcg"] = 1.0;
+    } else {
+        QJsonArray values;
+        const int count = qBound(1, params.beamCount, MaxBeams);
+        for (int beam = 0; beam < count; ++beam)
+            values.append(double(params.acgValue[beam]));
+        obj["bcg"] = values;
+    }
+    sendJsonCommand(obj);
+}
+
+void CTSPA22SDriver::setTCG(bool enabled, const PAParams &params)
+{
+    const int count = qBound(1, params.beamCount, MaxBeams);
+    for (int beam = 0; beam < count; ++beam) {
+        QJsonArray data;
+        if (enabled) {
+            for (int i = 0; i < 50; ++i) {
+                const int segment = i / 10;
+                const double fraction = (i % 10) / 10.0;
+                const double distance = params.tcgX[segment]
+                    + (params.tcgX[segment + 1] - params.tcgX[segment]) * fraction;
+                const int x = qRound(distance * 2.0 / params.lVelocity
+                                     * 1000000.0 / S22_SP);
+                const double ratio = params.tcgRatio[segment]
+                    + (params.tcgRatio[segment + 1] - params.tcgRatio[segment]) * fraction;
+                QJsonArray point; point.append(x); point.append(ratio);
+                data.append(point);
+            }
+        } else {
+            for (int i = 0; i < 10; ++i) {
+                const int x = qRound(i * 40.0 * params.range / WaveSampleCount * 2.0
+                                     / params.lVelocity * 1000000.0 / S22_SP);
+                QJsonArray point; point.append(x); point.append(1.0);
+                data.append(point);
+            }
+        }
+        QJsonObject tcg;
+        tcg["beam_index"] = beam;
+        tcg["data"] = data;
+        QJsonObject obj;
+        obj["tcg"] = tcg;
+        sendJsonCommand(obj);
+    }
 }
 
 // ================================================================

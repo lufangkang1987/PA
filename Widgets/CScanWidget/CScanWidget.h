@@ -27,9 +27,21 @@ public:
 
     /// 清空数据，回到 mock 显示
     void clearData();
+    void setSelectedLine(int line);
+    void setAnalysisRect(int line1, int line2, int column1, int column2);
+    void setPhysicalScale(float scanStepMm, float imageStartMm, float imageEndMm);
+    void setPageStart(int line);
+    void setImageColumnRange(int first, int last);
+    int pageStart() const { return m_pageStart; }
+
+signals:
+    void positionSelected(int line, int imageColumn);
+    void analysisRectChanged(int line1, int line2, int column1, int column2);
+    void analysisMeasured(float maximum, float average, int maxLine, int maxColumn);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     void rebuildMock(const QSize &size);
@@ -42,4 +54,16 @@ private:
     int m_dataWidth  = 0;
     int m_dataHeight = 0;
     bool m_replay    = false;
+    int m_selectedLine = -1;
+    int m_analysisLine1 = 110;
+    int m_analysisLine2 = 140;
+    int m_analysisColumn1 = 100;
+    int m_analysisColumn2 = 120;
+    float m_scanStepMm = 0.5f;
+    float m_imageStartMm = 0.0f;
+    float m_imageEndMm = 512.0f;
+    int m_pageStart = 0;
+    int m_imageColumnStart = 0;
+    int m_imageColumnEnd = 512;
+    static constexpr int PageLineCount = 925;
 };

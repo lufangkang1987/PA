@@ -34,6 +34,7 @@ public:
     virtual void setScanType(int type) = 0;
     virtual void setAnalogGain(float dB) = 0;
     virtual void setDigitalGain(float dB) = 0;
+    virtual void setTemperatureCompensation(bool enabled) = 0;
     virtual void setHighVoltage(int level) = 0;
     virtual void setPulseWidth(int width) = 0;
     virtual void setPRF(int prf) = 0;

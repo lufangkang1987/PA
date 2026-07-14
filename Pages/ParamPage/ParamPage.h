@@ -89,7 +89,6 @@ signals:
     void scanStopped();
     /// 保存数据 / 回放数据（由 MainWindow 连接处理，携带文件路径）
     void saveDataRequested(const QString &filePath);
-    void saveLegacyDataRequested(const QString &filePath);
     void replayDataRequested(const QString &filePath);
     void cScanPageRequested();
     void exitReplayRequested();
@@ -98,8 +97,6 @@ signals:
     void calibrationRequested(int item);
     void encoderCalibrationRequested();
     void cScanViewParamsChanged();
-    void legacyParamsLoadRequested(const QString &filePath);
-    void legacyParamsSaveRequested(const QString &filePath);
 
 private:
     QListWidget   *m_nav      = nullptr;

@@ -155,7 +155,7 @@ QVector<int> MTLDParser::parseTFMImage(const QByteArray &payload)
 // ================================================================
 
 CTSPA22SDriver::CTSPA22SDriver(QObject *parent)
-    : QObject(parent)
+    : IDriver(parent)
 {
     m_cmdSocket  = new QTcpSocket(this);
     m_dataSocket = new QTcpSocket(this);
@@ -200,22 +200,22 @@ bool CTSPA22SDriver::connectDevice(const QString &ip,
                                     quint16 dataPort)
 {
     if (m_connected) {
-        emit statusChanged("已经连接");
+        emit statusChanged(QString::fromUtf8("已经连接"));
         return true;
     }
 
-    emit statusChanged(QString("正在连接 %1 ...").arg(ip));
+    emit statusChanged(QString::fromUtf8("正在连接 %1 ...").arg(ip));
 
     m_cmdSocket->connectToHost(QHostAddress(ip), cmdPort);
     if (!m_cmdSocket->waitForConnected(5000)) {
-        emit errorOccurred("命令通道连接失败: " + m_cmdSocket->errorString());
+        emit errorOccurred(QString::fromUtf8("命令通道连接失败: ") + m_cmdSocket->errorString());
         return false;
     }
 
     m_dataSocket->connectToHost(QHostAddress(ip), dataPort);
     if (!m_dataSocket->waitForConnected(5000)) {
         m_cmdSocket->disconnectFromHost();
-        emit errorOccurred("数据通道连接失败: " + m_dataSocket->errorString());
+        emit errorOccurred(QString::fromUtf8("数据通道连接失败: ") + m_dataSocket->errorString());
         return false;
     }
 
@@ -232,7 +232,7 @@ bool CTSPA22SDriver::connectDevice(const QString &ip,
     });
 
     emit connectionChanged(true);
-    emit statusChanged(QString("已连接 %1 (命令:%2 数据:%3)")
+    emit statusChanged(QString::fromUtf8("已连接 %1 (命令:%2 数据:%3)")
                        .arg(ip).arg(cmdPort).arg(dataPort));
     return true;
 }
@@ -261,7 +261,7 @@ void CTSPA22SDriver::disconnectDevice()
     m_connected = false;
 
     emit connectionChanged(false);
-    emit statusChanged("已断开");
+    emit statusChanged(QString::fromUtf8("已断开"));
 }
 
 bool CTSPA22SDriver::isConnected() const
@@ -276,7 +276,7 @@ bool CTSPA22SDriver::isConnected() const
 void CTSPA22SDriver::startAcquisition()
 {
     if (!m_connected) {
-        emit statusChanged("未连接，无法启动采集");
+        emit statusChanged(QString::fromUtf8("未连接，无法启动采集"));
         return;
     }
 
@@ -296,7 +296,7 @@ void CTSPA22SDriver::startAcquisition()
     sendJsonCommand(cmd);
 
     m_acquiring = true;
-    emit statusChanged("开始采集");
+    emit statusChanged(QString::fromUtf8("开始采集"));
 }
 
 void CTSPA22SDriver::stopAcquisition()
@@ -308,7 +308,7 @@ void CTSPA22SDriver::stopAcquisition()
     sendJsonCommand(cmd);
 
     m_acquiring = false;
-    emit statusChanged("停止采集");
+    emit statusChanged(QString::fromUtf8("停止采集"));
 }
 
 // ================================================================
@@ -425,7 +425,7 @@ void CTSPA22SDriver::onCmdConnected()
     if (m_cmdReady && m_dataReady && !m_connected) {
         m_connected = true;
         emit connectionChanged(true);
-        emit statusChanged("双通道已连接");
+        emit statusChanged(QString::fromUtf8("双通道已连接"));
     }
 }
 
@@ -435,14 +435,14 @@ void CTSPA22SDriver::onCmdDisconnected()
     if (m_connected) {
         m_connected = false;
         emit connectionChanged(false);
-        emit statusChanged("命令通道断开");
+        emit statusChanged(QString::fromUtf8("命令通道断开"));
     }
 }
 
 void CTSPA22SDriver::onCmdError(QAbstractSocket::SocketError err)
 {
     Q_UNUSED(err);
-    emit errorOccurred("命令通道错误: " + m_cmdSocket->errorString());
+    emit errorOccurred(QString::fromUtf8("命令通道错误: ") + m_cmdSocket->errorString());
 }
 
 void CTSPA22SDriver::onDataConnected()
@@ -451,7 +451,7 @@ void CTSPA22SDriver::onDataConnected()
     if (m_cmdReady && m_dataReady && !m_connected) {
         m_connected = true;
         emit connectionChanged(true);
-        emit statusChanged("双通道已连接");
+        emit statusChanged(QString::fromUtf8("双通道已连接"));
     }
 }
 
@@ -461,14 +461,14 @@ void CTSPA22SDriver::onDataDisconnected()
     if (m_connected) {
         m_connected = false;
         emit connectionChanged(false);
-        emit statusChanged("数据通道断开");
+        emit statusChanged(QString::fromUtf8("数据通道断开"));
     }
 }
 
 void CTSPA22SDriver::onDataError(QAbstractSocket::SocketError err)
 {
     Q_UNUSED(err);
-    emit errorOccurred("数据通道错误: " + m_dataSocket->errorString());
+    emit errorOccurred(QString::fromUtf8("数据通道错误: ") + m_dataSocket->errorString());
 }
 
 // ================================================================
@@ -697,8 +697,8 @@ void CTSPA22SDriver::setScanType(int type)
     }
     if (m_acquiring)
         startAcquisition();
-    emit statusChanged(QString("扫查类型: %1").arg(
-        type == 0 ? "S扫" : type == 1 ? "L扫" : type == 2 ? "CL扫" : "TFM"));
+    emit statusChanged(QString::fromUtf8("扫查类型: %1").arg(
+        type == 0 ? QString::fromUtf8("S扫") : type == 1 ? QString::fromUtf8("L扫") : type == 2 ? QString::fromUtf8("CL扫") : "TFM"));
 }
 
 void CTSPA22SDriver::setAnalogGain(float dB)
@@ -966,5 +966,5 @@ void CTSPA22SDriver::powerOff()
     QJsonObject obj;
     obj["power"] = QString("off");
     sendJsonCommand(obj, false);  // 不等待响应，硬件可能直接断电
-    emit statusChanged("已发送远程关机指令");
+    emit statusChanged(QString::fromUtf8("已发送远程关机指令"));
 }

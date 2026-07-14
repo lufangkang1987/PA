@@ -65,12 +65,6 @@ void AScanWidget::setGate(int gate, bool enabled, float start, float width,
     update();
 }
 
-void AScanWidget::setGatesVisible(bool visible)
-{
-    m_gatesVisible = visible;
-    update();
-}
-
 void AScanWidget::setCalibrationGuide(bool visible, int targetPercent)
 {
     m_calibrationGuide = visible;
@@ -214,10 +208,10 @@ void AScanWidget::paintEvent(QPaintEvent *)
     }
 
     // ── 闸门绘制 (同MFC: 竖线, X=阈值; 回放时用replayGates) ──
-    if (m_gatesVisible) {
-        const float rng = m_replay ? m_replayRange : float(totalMm);
+    {
+        const float rng = float(totalMm);
         for (int g = 0; g < 3; ++g) {
-            const GateDef &gate = m_replay ? m_replayGates[g] : m_gates[g];
+            const GateDef &gate = m_gates[g];
             if (!gate.enabled) continue;
 
             const double y1 = plot.top() + (gate.start / rng) * plot.height();
@@ -248,7 +242,6 @@ void AScanWidget::paintEvent(QPaintEvent *)
         const char *mn = (m_rectifyMode >= 0 && m_rectifyMode <= 3) ? modes[m_rectifyMode] : "??";
         QString txt = QString("Beam %1  Frame %2  %3  %.1fmm  %4 FPS")
             .arg(m_beamIndex).arg(m_frameIndex).arg(mn).arg(totalMm, 0, 'f', 1).arg(m_currentFps, 0, 'f', 1);
-        if (m_replay) txt += "  REPLAY";
         p.setPen(m_isLive ? QColor(0, 220, 50, 200) : QColor(80, 100, 80, 150));
         p.drawText(plot.right() - hm.horizontalAdvance(txt) - 4,
                    plot.top() + 12, txt);
@@ -361,11 +354,3 @@ void AScanWidget::mouseReleaseEvent(QMouseEvent *ev)
     QWidget::mouseReleaseEvent(ev);
 }
 
-void AScanWidget::setReplayMode(bool on, float range, const GateDef gates[3])
-{
-    m_replay      = on;
-    m_replayRange = range;
-    for (int g = 0; g < 3; ++g)
-        m_replayGates[g] = gates[g];
-    update();
-}

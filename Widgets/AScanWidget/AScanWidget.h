@@ -48,8 +48,6 @@ public slots:
     void setGate(int gate, bool enabled, float start, float width,
                  float threshold, const QColor &color);
 
-    /// 显示/隐藏所有闸门
-    void setGatesVisible(bool visible);
     void setCalibrationGuide(bool visible, int targetPercent = 80);
 
     /// 设置当前拖拽闸门 (0=A, 1=B, 2=C)
@@ -58,9 +56,6 @@ public slots:
 
     /// 报警状态
     void setAlarm(bool on) { m_alarm = on; update(); }
-
-    /// 回放模式：用指定参数代替实时参数
-    void setReplayMode(bool on, float range, const GateDef gates[3]);
 
 signals:
     /// 闸门拖拽完成 (gate, start_mm, threshold_pct)
@@ -92,15 +87,11 @@ private:
 
     // ── 闸门 ──
     GateDef m_gates[3];              // 0=A, 1=B, 2=C
-    bool    m_gatesVisible = true;
     int     m_activeGate = 0;        // 当前拖拽闸门
     bool    m_dragging   = false;    // 正在拖拽中
     bool    m_alarm      = false;    // 报警状态
-    bool    m_replay     = false;    // 回放模式
     bool    m_calibrationGuide = false;
     int     m_calibrationTarget = 80;
-    float   m_replayRange= 0.0f;
-    GateDef m_replayGates[3];        // 回放用的闸门参数
     QElapsedTimer m_fpsTimer;
     int  m_frameCount   = 0;
     float m_currentFps  = 0.0f;

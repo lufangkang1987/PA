@@ -155,7 +155,7 @@ static QFrame* makeCard(const QString& title, QWidget* content, const QString& m
 
 static ElidedLabel* statusItem(const QString& label, const QString& value, bool ok = false)
 {
-	const QString full = QString("%1： %2").arg(label, value);
+	const QString full = QString::fromUtf8("%1： %2").arg(label, value);
 	auto* item = new ElidedLabel(full);
 	item->setObjectName("StatusItem");
 	item->setStyleSheet(QString("color:%1;").arg(ok ? "#1eea36" : "#d7e8f2"));
@@ -195,9 +195,9 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 	setGateParams(1, true,  6.2f, 3.0f, 30.0f, QColor(255, 200, 0));
 	setGateParams(2, true,  0.5f, 3.0f, 30.0f, QColor(200, 50, 255));
 
-	grid->addWidget(makeCard("A扫波形", m_aScan, "通道：1 | 增益：18.0 dB"), 0, 0);
-	grid->addWidget(makeCard("B扫图像", m_bScan, "扫描范围：200.0 mm"), 0, 1);
-	grid->addWidget(makeCard("C扫图像", m_cScan), 1, 0, 1, 2);
+	grid->addWidget(makeCard(QString::fromUtf8("A扫波形"), m_aScan, QString::fromUtf8("通道：1 | 增益：18.0 dB")), 0, 0);
+	grid->addWidget(makeCard(QString::fromUtf8("B扫图像"), m_bScan, QString::fromUtf8("扫描范围：200.0 mm")), 0, 1);
+	grid->addWidget(makeCard(QString::fromUtf8("C扫图像"), m_cScan), 1, 0, 1, 2);
 
 	grid->setColumnStretch(0, 5);
 	grid->setColumnStretch(1, 6);
@@ -212,13 +212,13 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 	auto* statusLayout = new QHBoxLayout(statusBar);
 	statusLayout->setContentsMargins(12, 2, 12, 2);
 	statusLayout->setSpacing(16);
-	m_scanLengthStatus = statusItem("扫描长度", "0.00 mm");
-	m_scannedLengthStatus = statusItem("已扫长度", "0.00 mm");
-	m_progressStatus = statusItem("完成进度", "0%");
-	m_speedStatus = statusItem("速度", "0.0 mm/s");
-	m_analysisStatus = statusItem("分析", "--");
-	m_frameDiffStatus = statusItem("帧差", "0");
-	m_droppedFrameStatus = statusItem("漏帧", "0");
+	m_scanLengthStatus = statusItem(QString::fromUtf8("扫描长度"), "0.00 mm");
+	m_scannedLengthStatus = statusItem(QString::fromUtf8("已扫长度"), "0.00 mm");
+	m_progressStatus = statusItem(QString::fromUtf8("完成进度"), "0%");
+	m_speedStatus = statusItem(QString::fromUtf8("速度"), "0.0 mm/s");
+	m_analysisStatus = statusItem(QString::fromUtf8("分析"), "--");
+	m_frameDiffStatus = statusItem(QString::fromUtf8("帧差"), "0");
+	m_droppedFrameStatus = statusItem(QString::fromUtf8("漏帧"), "0");
 	statusLayout->addWidget(m_scanLengthStatus);
 	statusLayout->addWidget(m_scannedLengthStatus);
 	statusLayout->addWidget(m_progressStatus);
@@ -239,7 +239,7 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 	root->addLayout(grid, 1);
 	root->addWidget(statusBar);
 
-	m_status = new QLabel("系统状态：待机");
+	m_status = new QLabel(QString::fromUtf8("系统状态：待机"));
 	m_status->hide();
 
 	setStyleSheet(R"(
@@ -272,27 +272,26 @@ void HomePage::setDriver(IDriver* driver)
 {
 	if (!driver) return;
 
-	QObject* qobj = driver->asQObject();
 
 	connect(m_aScan, &AScanWidget::gateDragged, this, &HomePage::gateDragged);
 	connect(m_aScan, &AScanWidget::beamChangeRequested, this, &HomePage::beamChangeRequested);
 
-	if (auto* ct = qobject_cast<CTSPA22SDriver*>(qobj)) {
-		connect(ct, &CTSPA22SDriver::waveformReady, m_aScan, &AScanWidget::setWaveform);
-		connect(ct, &CTSPA22SDriver::statusChanged, this, [this](const QString& s) {
+	{
+		connect(driver, &IDriver::waveformReady, m_aScan, &AScanWidget::setWaveform);
+		connect(driver, &IDriver::statusChanged, this, [this](const QString& s) {
 			m_status->setText(QString::fromUtf8("系统状态：") + s);
 		});
-		connect(ct, &CTSPA22SDriver::frameStatisticsChanged,
+		connect(driver, &IDriver::frameStatisticsChanged,
 		        this, &HomePage::updateFrameStatistics);
-		connect(ct, &CTSPA22SDriver::multiBeamWaveformsReady, this, [this](const QVector<QVector<double>> &waves) {
+		connect(driver, &IDriver::multiBeamWaveformsReady, this, [this](const QVector<QVector<double>> &waves) {
 			m_bScan->setMultiBeamData(waves, /*isRF*/ false);
 			bool alarm = false;
 			for (const auto &w : waves)
 				for (const auto &v : w) { if (v > 0.8) { alarm = true; break; } }
 			if (m_aScan) m_aScan->setAlarm(alarm);
 		});
-		connect(ct, &CTSPA22SDriver::tfmImageReady, this, [this](const QVector<int>&) {});
-		connect(ct, &CTSPA22SDriver::gateReadingsReady, this, [](char gate, double amp, double path) {
+		connect(driver, &IDriver::tfmImageReady, this, [this](const QVector<int>&) {});
+		connect(driver, &IDriver::gateReadingsReady, this, [](char gate, double amp, double path) {
 			Q_UNUSED(gate); Q_UNUSED(amp); Q_UNUSED(path);
 			// 闸门读数 → MeasurePage（由 MainWindow 连接）
 		});
@@ -386,19 +385,19 @@ void HomePage::updateCScanMetrics(int lines, int totalLines, double scannedMm,
     const double totalMm = totalLines > 0 && lines > 0
         ? scannedMm * totalLines / lines : 0.0;
     const int percent = totalLines > 0 ? qBound(0, lines * 100 / totalLines, 100) : 0;
-    m_scanLengthStatus->setFullText(QString("扫描长度：%1 mm").arg(totalMm, 0, 'f', 2));
-    m_scannedLengthStatus->setFullText(QString("已扫长度：%1 mm").arg(scannedMm, 0, 'f', 2));
-    m_progressStatus->setFullText(QString("完成进度：%1%").arg(percent));
-    m_speedStatus->setFullText(QString("速度：%1 mm/s (平均 %2)")
+    m_scanLengthStatus->setFullText(QString::fromUtf8("扫描长度：%1 mm").arg(totalMm, 0, 'f', 2));
+    m_scannedLengthStatus->setFullText(QString::fromUtf8("已扫长度：%1 mm").arg(scannedMm, 0, 'f', 2));
+    m_progressStatus->setFullText(QString::fromUtf8("完成进度：%1%").arg(percent));
+    m_speedStatus->setFullText(QString::fromUtf8("速度：%1 mm/s (平均 %2)")
         .arg(speedMmPerSec, 0, 'f', 1).arg(averageMmPerSec, 0, 'f', 1));
 }
 
 void HomePage::updateFrameStatistics(int frameDiff, quint64 droppedFrames)
 {
     if (m_frameDiffStatus)
-        m_frameDiffStatus->setFullText(QString("帧差：%1").arg(frameDiff));
+        m_frameDiffStatus->setFullText(QString::fromUtf8("帧差：%1").arg(frameDiff));
     if (m_droppedFrameStatus)
-        m_droppedFrameStatus->setFullText(QString("漏帧：%1").arg(droppedFrames));
+        m_droppedFrameStatus->setFullText(QString::fromUtf8("漏帧：%1").arg(droppedFrames));
 }
 
 void HomePage::showReplayPacket(const DataPacket &packet, int line,

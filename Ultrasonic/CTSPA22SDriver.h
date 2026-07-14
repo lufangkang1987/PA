@@ -64,7 +64,7 @@ private:
 ///           aScanWidget, &AScanWidget::setWaveform);
 /// @endcode
 ///
-class CTSPA22SDriver : public QObject, public IDriver
+class CTSPA22SDriver : public IDriver
 {
     Q_OBJECT
 
@@ -73,7 +73,6 @@ public:
     ~CTSPA22SDriver() override;
 
     // ========== IDriver 接口 ==========
-    QObject* asQObject() override { return this; }
     bool connectDevice(const QString &ip,
                        quint16 cmdPort  = 51007,
                        quint16 dataPort = 51005);

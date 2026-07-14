@@ -1,21 +1,13 @@
 #pragma once
-#include <QObject>
 #include "DataTypes.h"
+#include <QObject>
 
-/// @brief 超声仪器 Driver 统一接口
-///
-/// 所有仪器 Driver（USM100、CTSPA22S 等）都实现此接口，
-/// 使得 MainWindow 可以无缝切换不同仪器。
-///
-/// @see USM100Driver  GE USM100 模拟 Driver
-/// @see CTSPA22SDriver  汕头超声 CTSPA22S 真实 TCP Driver
-class IDriver
+class IDriver : public QObject
 {
-public:
-    virtual ~IDriver() = default;
+    Q_OBJECT
 
-    /// 将自身暴露为 QObject*，用于 connect / qobject_cast 等 Qt 操作
-    virtual QObject* asQObject() = 0;
+public:
+    using QObject::QObject;
 
     // -------- 连接管理 --------
     virtual bool connectDevice(const QString &ip, quint16 port) = 0;
@@ -30,7 +22,7 @@ public:
     // -------- 设备控制 --------
     virtual void powerOff() = 0;
 
-    // -------- 参数设置 --------
+    // -------- 基础参数 --------
     virtual void setScanType(int type) = 0;
     virtual void setAnalogGain(float dB) = 0;
     virtual void setDigitalGain(float dB) = 0;
@@ -51,7 +43,7 @@ public:
     virtual void setTFMImageProcess(double subtract, double supress, double smooth) = 0;
     virtual void resetEncoder(int idx) = 0;
 
-    // -------- 扫查配置（供"应用法则"批量下发）--------
+    // -------- 扫查配置（"应用法则"批量下发）--------
     virtual void setVelocity(float mps) = 0;
     virtual void setProbeGeometry(int count, float freqMHz, float pitchMm) = 0;
     virtual void setElementGeometry(int start, int end, int aperture) = 0;
@@ -59,4 +51,23 @@ public:
     virtual void setLscanAngle(float angleDeg) = 0;
     virtual void setFocusMm(float mm) = 0;
     virtual void setWedgeGeometry(bool enable, float angleDeg, int velocityMps, float heightMm) = 0;
+
+    // -------- 遥测 --------
+    virtual void queryTemperature() = 0;
+    virtual void queryVoltage() = 0;
+
+signals:
+    void connectionChanged(bool connected);
+    void statusChanged(const QString &status);
+    void errorOccurred(const QString &error);
+    void waveformReady(const QVector<double> &waveform, int beamIndex, int frameIndex, int rectifyMode);
+    void multiBeamWaveformsReady(const QVector<QVector<double>> &waveforms);
+    void dataPacketReady(const DataPacket &packet);
+    void scanRulePositionsReady(const QVector<double> &positions);
+    void gateReadingsReady(char gate, double amplitude, double path);
+    void encoderPositionChanged(int position);
+    void frameStatisticsChanged(int frameDiff, quint64 droppedFrames);
+    void tfmImageReady(const QVector<int> &image);
+    void temperatureReceived(double tempC);
+    void voltageReceived(double voltage);
 };

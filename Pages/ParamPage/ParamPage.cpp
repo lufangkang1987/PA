@@ -178,7 +178,7 @@ QWidget *ParamPage::createCategoryPage(const QString &title)
 
 void ParamPage::buildTransmitPage()
 {
-    auto *page = createCategoryPage("发射参数");
+    auto *page = createCategoryPage(QString::fromUtf8("发射参数"));
     auto *content = page->property("contentWidget").value<QWidget*>();
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
@@ -186,24 +186,24 @@ void ParamPage::buildTransmitPage()
     auto *f = makeForm(form);
 
     m_voltCombo = makeCombo({"110 V", "40 V", "20 V"}, m_params.highVoltage);
-    f->addRow("发射电压", m_voltCombo);
+    f->addRow(QString::fromUtf8("发射电压"), m_voltCombo);
 
     m_pulseWidthSpin = makeIntSpin(30, 1250, m_params.pulseWidth, 10);
     m_pulseWidthSpin->setSuffix(" ns");
-    f->addRow("脉冲宽度", wrapWithStepSelector(m_pulseWidthSpin, {"10", "50", "100"}, {10.0, 50.0, 100.0}, 1));
+    f->addRow(QString::fromUtf8("脉冲宽度"), wrapWithStepSelector(m_pulseWidthSpin, {"10", "50", "100"}, {10.0, 50.0, 100.0}, 1));
 
     m_prfSpin = makeIntSpin(25, 20000, m_params.prf, 100);
     m_prfSpin->setSuffix(" Hz");
-    f->addRow("重复频率", wrapWithStepSelector(m_prfSpin, {"5", "100", "1000"}, {5.0, 100.0, 1000.0}, 1));
+    f->addRow(QString::fromUtf8("重复频率"), wrapWithStepSelector(m_prfSpin, {"5", "100", "1000"}, {5.0, 100.0, 1000.0}, 1));
 
     m_rangeSpin = makeDoubleSpin(5.0, 1000.0, m_params.range, 0.1, "mm", 1);
-    f->addRow("检测范围", wrapWithStepSelector(m_rangeSpin, {"0.1", "1.0", "10.0", "100.0"}, {0.1, 1.0, 10.0, 100.0}, 1));
+    f->addRow(QString::fromUtf8("检测范围"), wrapWithStepSelector(m_rangeSpin, {"0.1", "1.0", "10.0", "100.0"}, {0.1, 1.0, 10.0, 100.0}, 1));
 
-    m_tempCorrectCombo = makeCombo({"关", "开"}, m_params.tempCorrect);
-    f->addRow("温度补偿", m_tempCorrectCombo);
+    m_tempCorrectCombo = makeCombo({QString::fromUtf8("关"), QString::fromUtf8("开")}, m_params.tempCorrect);
+    f->addRow(QString::fromUtf8("温度补偿"), m_tempCorrectCombo);
 
-    m_aDataLenCombo = makeCombo({"100 点", "200 点", "400 点"}, m_params.aDataLen);
-    f->addRow("A波长度", m_aDataLenCombo);
+    m_aDataLenCombo = makeCombo({QString::fromUtf8("100 点"), QString::fromUtf8("200 点"), QString::fromUtf8("400 点")}, m_params.aDataLen);
+    f->addRow(QString::fromUtf8("A波长度"), m_aDataLenCombo);
 
     // ── 硬件下发 ──
     connect(m_voltCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
@@ -238,7 +238,7 @@ void ParamPage::buildTransmitPage()
 
 void ParamPage::buildReceivePage()
 {
-    auto *page = createCategoryPage("接收参数");
+    auto *page = createCategoryPage(QString::fromUtf8("接收参数"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
@@ -246,18 +246,18 @@ void ParamPage::buildReceivePage()
 
     // 模拟增益: 步进 [0.1, 1.0, 6.0] dB, 默认1.0
     m_aGainSpin = makeDoubleSpin(0.0, 80.0, m_params.aGain, 0.1, "dB");
-    f->addRow("模拟增益", wrapWithStepSelector(m_aGainSpin, {"0.1", "1.0", "6.0"}, {0.1, 1.0, 6.0}, 1));
+    f->addRow(QString::fromUtf8("模拟增益"), wrapWithStepSelector(m_aGainSpin, {"0.1", "1.0", "6.0"}, {0.1, 1.0, 6.0}, 1));
 
     // 数字增益: 步进 [0.1, 1.0, 6.0] dB, 默认1.0
     m_dGainSpin = makeDoubleSpin(-12.0, 12.0, m_params.dGain, 0.1, "dB");
-    f->addRow("数字增益", wrapWithStepSelector(m_dGainSpin, {"0.1", "1.0", "6.0"}, {0.1, 1.0, 6.0}, 1));
+    f->addRow(QString::fromUtf8("数字增益"), wrapWithStepSelector(m_dGainSpin, {"0.1", "1.0", "6.0"}, {0.1, 1.0, 6.0}, 1));
 
     // 声束号: 步进 [1, 10], 默认1 (细=中=1, 粗=10)
     m_beamNoSpin = makeIntSpin(0, 127, m_params.curBeam, 1);
-    f->addRow("声束号", wrapWithStepSelector(m_beamNoSpin, {"1", "10"}, {1.0, 10.0}, 0));
+    f->addRow(QString::fromUtf8("声束号"), wrapWithStepSelector(m_beamNoSpin, {"1", "10"}, {1.0, 10.0}, 0));
 
-    m_rectifyCombo = makeCombo({"全波", "正半波", "负半波"}, m_params.rectify);
-    f->addRow("检波方式", m_rectifyCombo);
+    m_rectifyCombo = makeCombo({QString::fromUtf8("全波"), QString::fromUtf8("正半波"), QString::fromUtf8("负半波")}, m_params.rectify);
+    f->addRow(QString::fromUtf8("检波方式"), m_rectifyCombo);
 
     m_filterCombo = makeCombo({
         "0.5-20.0 MHz", "0.5-15.0 MHz", "0.5-10.0 MHz", "0.5-5.0 MHz",
@@ -265,10 +265,10 @@ void ParamPage::buildReceivePage()
         "10.0-20.0 MHz", "1.0 MHz", "2.5 MHz", "4.0 MHz",
         "5.0 MHz", "7.5 MHz", "10.0 MHz", "15.0 MHz"
     }, m_params.filter);
-    f->addRow("滤波器", m_filterCombo);
+    f->addRow(QString::fromUtf8("滤波器"), m_filterCombo);
 
-    m_videoCombo = makeCombo({"无", "1", "2", "3", "4", "平滑"}, m_params.video);
-    f->addRow("视频检波", m_videoCombo);
+    m_videoCombo = makeCombo({QString::fromUtf8("无"), "1", "2", "3", "4", QString::fromUtf8("平滑")}, m_params.video);
+    f->addRow(QString::fromUtf8("视频检波"), m_videoCombo);
 
     // ── 硬件下发 ──
     connect(m_aGainSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double v) {
@@ -312,60 +312,60 @@ void ParamPage::buildReceivePage()
 
 void ParamPage::buildGatePage()
 {
-    auto *page = createCategoryPage("闸门参数");
+    auto *page = createCategoryPage(QString::fromUtf8("闸门参数"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
-    m_gateSelCombo = makeCombo({"A 闸门", "B 闸门", "C 闸门"}, m_params.gateSelect);
+    m_gateSelCombo = makeCombo({QString::fromUtf8("A 闸门"), QString::fromUtf8("B 闸门"), QString::fromUtf8("C 闸门")}, m_params.gateSelect);
     connect(m_gateSelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ParamPage::onGateSelectChanged);
-    f->addRow("闸门选择", m_gateSelCombo);
+    f->addRow(QString::fromUtf8("闸门选择"), m_gateSelCombo);
 
     // 闸门起位: 步进 [0.1, 1.0, 10.0] mm, 默认1.0
     m_gateStartSpin = makeDoubleSpin(0.0, 999.0,
         m_params.gateStart[qBound(0, m_params.gateSelect, 2)], 0.1, "mm");
     connect(m_gateStartSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &ParamPage::onGateParamChanged);
-    f->addRow("闸门起位", wrapWithStepSelector(m_gateStartSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    f->addRow(QString::fromUtf8("闸门起位"), wrapWithStepSelector(m_gateStartSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
     // 闸门宽度: 步进 [0.1, 1.0, 10.0] mm, 默认1.0
     m_gateWidthSpin = makeDoubleSpin(0.0, 999.0,
         m_params.gateWidth[qBound(0, m_params.gateSelect, 2)], 0.1, "mm");
     connect(m_gateWidthSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &ParamPage::onGateParamChanged);
-    f->addRow("闸门宽度", wrapWithStepSelector(m_gateWidthSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    f->addRow(QString::fromUtf8("闸门宽度"), wrapWithStepSelector(m_gateWidthSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
     // 闸门高度: 步进 [0.1, 1.0, 10.0] %, 默认1.0
     m_gateThreshSpin = makeDoubleSpin(0.0, 99.0,
         m_params.gateThreshold[qBound(0, m_params.gateSelect, 2)], 0.1, "%");
     connect(m_gateThreshSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &ParamPage::onGateParamChanged);
-    f->addRow("闸门高度", wrapWithStepSelector(m_gateThreshSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    f->addRow(QString::fromUtf8("闸门高度"), wrapWithStepSelector(m_gateThreshSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
-    m_gateMeasureCombo = makeCombo({"峰值", "前沿"},
+    m_gateMeasureCombo = makeCombo({QString::fromUtf8("峰值"), QString::fromUtf8("前沿")},
         m_params.gateMeasure[qBound(0, m_params.gateSelect, 2)]);
     connect(m_gateMeasureCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ParamPage::onGateParamChanged);
-    f->addRow("测量方式", m_gateMeasureCombo);
+    f->addRow(QString::fromUtf8("测量方式"), m_gateMeasureCombo);
 
-    m_gateAlarmCombo = makeCombo({"关", "开"},
+    m_gateAlarmCombo = makeCombo({QString::fromUtf8("关"), QString::fromUtf8("开")},
         m_params.gateAlarm[qBound(0, m_params.gateSelect, 2)]);
     connect(m_gateAlarmCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ParamPage::onGateParamChanged);
-    f->addRow("报警开关", m_gateAlarmCombo);
+    f->addRow(QString::fromUtf8("报警开关"), m_gateAlarmCombo);
 
-    m_gateTraceCombo = makeCombo({"关", "开"},
+    m_gateTraceCombo = makeCombo({QString::fromUtf8("关"), QString::fromUtf8("开")},
         m_params.gateTrace[qBound(0, m_params.gateSelect, 2)]);
     connect(m_gateTraceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ParamPage::onGateParamChanged);
-    f->addRow("跟踪开关", m_gateTraceCombo);
+    f->addRow(QString::fromUtf8("跟踪开关"), m_gateTraceCombo);
 
-    m_alarmSoundCombo = makeCombo({"关", "A 门", "B 门", "AB 门"}, m_params.alarmSound);
+    m_alarmSoundCombo = makeCombo({QString::fromUtf8("关"), QString::fromUtf8("A 门"), QString::fromUtf8("B 门"), QString::fromUtf8("AB 门")}, m_params.alarmSound);
     connect(m_alarmSoundCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int idx) { m_params.alarmSound = idx; });
-    f->addRow("报警声", m_alarmSoundCombo);
+    f->addRow(QString::fromUtf8("报警声"), m_alarmSoundCombo);
 
     layout->addWidget(form);
     layout->addStretch();
@@ -374,28 +374,28 @@ void ParamPage::buildGatePage()
 
 void ParamPage::buildProbePage()
 {
-    auto *page = createCategoryPage("探头参数");
+    auto *page = createCategoryPage(QString::fromUtf8("探头参数"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
-    m_probeTypeCombo = makeCombo({"自定义", "2.5L16", "5.0S64"}, m_params.probeType);
+    m_probeTypeCombo = makeCombo({QString::fromUtf8("自定义"), "2.5L16", "5.0S64"}, m_params.probeType);
     connect(m_probeTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ParamPage::onProbeTypeChanged);
-    f->addRow("探头型号", m_probeTypeCombo);
+    f->addRow(QString::fromUtf8("探头型号"), m_probeTypeCombo);
 
     // 探头频率: 步进 [0.1, 1.0] MHz (细=中=0.1, 粗=1.0)
     m_probeFreqSpin = makeDoubleSpin(0.2, 20.0, m_params.probeFreq, 0.1, "MHz");
-    f->addRow("探头频率", wrapWithStepSelector(m_probeFreqSpin, {"0.1", "1.0"}, {0.1, 1.0}, 0));
+    f->addRow(QString::fromUtf8("探头频率"), wrapWithStepSelector(m_probeFreqSpin, {"0.1", "1.0"}, {0.1, 1.0}, 0));
 
     // 阵元数: 步进 [1, 10] (细=中=1, 粗=10)
     m_probeCountSpin = makeIntSpin(1, 128, m_params.probeCount, 1);
-    f->addRow("阵元数", wrapWithStepSelector(m_probeCountSpin, {"1", "10"}, {1.0, 10.0}, 0));
+    f->addRow(QString::fromUtf8("阵元数"), wrapWithStepSelector(m_probeCountSpin, {"1", "10"}, {1.0, 10.0}, 0));
 
     // 阵元间距: 步进 [0.01, 0.1, 1.0] mm, 默认0.1
     m_probePitchSpin = makeDoubleSpin(0.10, 15.00, m_params.probePitch, 0.01, "mm", 2);
-    f->addRow("阵元间距", wrapWithStepSelector(m_probePitchSpin, {"0.01", "0.1", "1.0"}, {0.01, 0.1, 1.0}, 1));
+    f->addRow(QString::fromUtf8("阵元间距"), wrapWithStepSelector(m_probePitchSpin, {"0.01", "0.1", "1.0"}, {0.01, 0.1, 1.0}, 1));
 
     // 同步到 m_params（下发由"应用法则"统一触发）
     connect(m_probeTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) { m_params.probeType = v; });
@@ -410,32 +410,32 @@ void ParamPage::buildProbePage()
 
 void ParamPage::buildWedgePage()
 {
-    auto *page = createCategoryPage("楔块参数");
+    auto *page = createCategoryPage(QString::fromUtf8("楔块参数"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
-    m_wedgeEnableCombo = makeCombo({"否", "是"}, m_params.wedgeEnable);
-    f->addRow("楔块启用", m_wedgeEnableCombo);
+    m_wedgeEnableCombo = makeCombo({QString::fromUtf8("否"), QString::fromUtf8("是")}, m_params.wedgeEnable);
+    f->addRow(QString::fromUtf8("楔块启用"), m_wedgeEnableCombo);
 
-    m_wedgeTypeCombo = makeCombo({"自定义", "GW-PA"}, m_params.wedgeType);
+    m_wedgeTypeCombo = makeCombo({QString::fromUtf8("自定义"), "GW-PA"}, m_params.wedgeType);
     connect(m_wedgeTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ParamPage::onWedgeTypeChanged);
-    f->addRow("楔块型号", m_wedgeTypeCombo);
+    f->addRow(QString::fromUtf8("楔块型号"), m_wedgeTypeCombo);
 
     // 楔块角度: 步进 [0.1, 1.0, 10.0]°, 默认1.0
     m_wedgeAngleSpin = makeDoubleSpin(0.0, 89.0, m_params.wedgeAngle, 0.1, QString::fromUtf8("\u00B0"));
-    f->addRow("楔块角度", wrapWithStepSelector(m_wedgeAngleSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    f->addRow(QString::fromUtf8("楔块角度"), wrapWithStepSelector(m_wedgeAngleSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
     // 楔块声速: 步进 [1, 10, 100] m/s, 默认10
     m_wedgeVelSpin = makeIntSpin(1000, 9000, m_params.wedgeVelocity, 10);
     m_wedgeVelSpin->setSuffix(" m/s");
-    f->addRow("楔块声速", wrapWithStepSelector(m_wedgeVelSpin, {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
+    f->addRow(QString::fromUtf8("楔块声速"), wrapWithStepSelector(m_wedgeVelSpin, {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
 
     // 楔块高度: 步进 [0.1, 1.0, 10.0] mm, 默认1.0
     m_wedgeHeightSpin = makeDoubleSpin(0.1, 100.0, m_params.wedgeHeight, 0.1, "mm");
-    f->addRow("楔块高度", wrapWithStepSelector(m_wedgeHeightSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    f->addRow(QString::fromUtf8("楔块高度"), wrapWithStepSelector(m_wedgeHeightSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
     // 同步到 m_params
     connect(m_wedgeEnableCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) { m_params.wedgeEnable = v; });
@@ -451,24 +451,24 @@ void ParamPage::buildWedgePage()
 
 void ParamPage::buildWorkpiecePage()
 {
-    auto *page = createCategoryPage("工件参数");
+    auto *page = createCategoryPage(QString::fromUtf8("工件参数"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
-    m_materialCombo = makeCombo({"钢纵波", "钢横波"}, m_params.material);
+    m_materialCombo = makeCombo({QString::fromUtf8("钢纵波"), QString::fromUtf8("钢横波")}, m_params.material);
     connect(m_materialCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ParamPage::onMaterialChanged);
-    f->addRow("材料", m_materialCombo);
+    f->addRow(QString::fromUtf8("材料"), m_materialCombo);
 
     // 工件声速: 步进 [1, 10, 100] m/s, 默认10
     m_lVelSpin = makeIntSpin(1000, 9000, m_params.lVelocity, 10);
     m_lVelSpin->setSuffix(" m/s");
-    f->addRow("声速", wrapWithStepSelector(m_lVelSpin, {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
+    f->addRow(QString::fromUtf8("声速"), wrapWithStepSelector(m_lVelSpin, {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
 
-    m_traceEnableCombo = makeCombo({"否", "是"}, m_params.traceEnable);
-    f->addRow("跟踪启用", m_traceEnableCombo);
+    m_traceEnableCombo = makeCombo({QString::fromUtf8("否"), QString::fromUtf8("是")}, m_params.traceEnable);
+    f->addRow(QString::fromUtf8("跟踪启用"), m_traceEnableCombo);
 
     connect(m_materialCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) { m_params.material = v; });
     connect(m_lVelSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) { m_params.lVelocity = v; });
@@ -481,17 +481,17 @@ void ParamPage::buildWorkpiecePage()
 
 void ParamPage::buildScanPage()
 {
-    auto *page = createCategoryPage("扫查参数");
+    auto *page = createCategoryPage(QString::fromUtf8("扫查参数"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
     // 槽位0: 扫查方式（固定）
-    m_scanTypeCombo = makeCombo({"S 扫", "L 扫"}, m_params.scanType);
+    m_scanTypeCombo = makeCombo({QString::fromUtf8("S 扫"), QString::fromUtf8("L 扫")}, m_params.scanType);
     connect(m_scanTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ParamPage::onScanTypeChanged);
-    f->addRow("扫查方式", m_scanTypeCombo);
+    f->addRow(QString::fromUtf8("扫查方式"), m_scanTypeCombo);
 
     // 槽位1-6: 动态控件，根据 scanType 变化
     for (int i = 1; i <= 6; ++i) {
@@ -510,38 +510,38 @@ void ParamPage::buildScanPage()
 
 void ParamPage::buildTcgPage()
 {
-    auto *page = createCategoryPage("校准内容");
+    auto *page = createCategoryPage(QString::fromUtf8("校准内容"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
     // 校准项目: 声速 / 声束延迟 / ACG / TCG
-    auto *calibItem = makeCombo({"声速", "声束延迟", "ACG", "TCG"}, m_params.calibItem);
-    f->addRow("校准项目", calibItem);
+    auto *calibItem = makeCombo({QString::fromUtf8("声速"), QString::fromUtf8("声束延迟"), "ACG", "TCG"}, m_params.calibItem);
+    f->addRow(QString::fromUtf8("校准项目"), calibItem);
 
     // 实际距离: 10~1000 mm, 步进 0.1/1.0/10.0
     auto *realDist = makeDoubleSpin(10.0, 1000.0, m_params.realDistance, 0.1, "mm", 1);
-    f->addRow("实际距离", wrapWithStepSelector(realDist, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    f->addRow(QString::fromUtf8("实际距离"), wrapWithStepSelector(realDist, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
     // 声束延迟: 0~100 us, 步进 0.1/1.0/10.0
     auto *beamDelay = makeDoubleSpin(0.0, 100.0, m_params.beamDelay, 0.1, "us", 1);
-    f->addRow("声束延迟", wrapWithStepSelector(beamDelay, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    f->addRow(QString::fromUtf8("声束延迟"), wrapWithStepSelector(beamDelay, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
     // TCG系数: 0~0.5, 步进 0.001/0.01/0.1
     auto *tcgCoeff = makeDoubleSpin(0.0, 0.5, m_params.tcgCoeff, 0.001, "", 3);
-    f->addRow("TCG系数", wrapWithStepSelector(tcgCoeff, {"0.001", "0.01", "0.1"}, {0.001, 0.01, 0.1}, 1));
+    f->addRow(QString::fromUtf8("TCG系数"), wrapWithStepSelector(tcgCoeff, {"0.001", "0.01", "0.1"}, {0.001, 0.01, 0.1}, 1));
 
     // TCG参考点: 共 9 个参考点
-    auto *refLabel = new QLabel("共 9 个参考点");
-    f->addRow("TCG参考点", refLabel);
+    auto *refLabel = new QLabel(QString::fromUtf8("共 9 个参考点"));
+    f->addRow(QString::fromUtf8("TCG参考点"), refLabel);
 
     // 校准启用: 关闭 / ACG
-    auto *calibEnable = makeCombo({"关闭", "ACG"}, m_params.calibEnable);
-    f->addRow("校准启用", calibEnable);
+    auto *calibEnable = makeCombo({QString::fromUtf8("关闭"), "ACG"}, m_params.calibEnable);
+    f->addRow(QString::fromUtf8("校准启用"), calibEnable);
 
     layout->addWidget(form);
-    m_calibrationBtn = new QPushButton("开始 / 完成校准");
+    m_calibrationBtn = new QPushButton(QString::fromUtf8("开始 / 完成校准"));
     m_calibrationBtn->setFixedHeight(36);
     layout->addWidget(m_calibrationBtn);
     layout->addStretch();
@@ -567,7 +567,7 @@ void ParamPage::buildTcgPage()
 
 void ParamPage::buildImagingPage()
 {
-    auto *page = createCategoryPage("C扫成像参数");
+    auto *page = createCategoryPage(QString::fromUtf8("C扫成像参数"));
     auto *content = page->property("contentWidget").value<QWidget*>();
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
@@ -588,11 +588,11 @@ void ParamPage::buildImagingPage()
     m_imagingLineSpin[2] = makeIntSpin(0, 399, m_params.imgLineY1, 10);
     m_imagingLineSpin[3] = makeIntSpin(0, 399, m_params.imgLineY2, 10);
     m_degPerPointSpin = makeDoubleSpin(0.1, 5.0, m_params.degPerPoint, 0.1, "mm/d");
-    f->addRow("采集线 X1", compactField(wrapWithStepSelector(m_imagingLineSpin[0], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
-    f->addRow("采集线 X2", compactField(wrapWithStepSelector(m_imagingLineSpin[1], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
-    f->addRow("采集线 Y1", compactField(wrapWithStepSelector(m_imagingLineSpin[2], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
-    f->addRow("采集线 Y2", compactField(wrapWithStepSelector(m_imagingLineSpin[3], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
-    f->addRow("C扫增量", compactField(wrapWithStepSelector(m_degPerPointSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1)));
+    f->addRow(QString::fromUtf8("采集线 X1"), compactField(wrapWithStepSelector(m_imagingLineSpin[0], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
+    f->addRow(QString::fromUtf8("采集线 X2"), compactField(wrapWithStepSelector(m_imagingLineSpin[1], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
+    f->addRow(QString::fromUtf8("采集线 Y1"), compactField(wrapWithStepSelector(m_imagingLineSpin[2], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
+    f->addRow(QString::fromUtf8("采集线 Y2"), compactField(wrapWithStepSelector(m_imagingLineSpin[3], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1)));
+    f->addRow(QString::fromUtf8("C扫增量"), compactField(wrapWithStepSelector(m_degPerPointSpin, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1)));
     for (int i = 0; i < 4; ++i)
         connect(m_imagingLineSpin[i], QOverload<int>::of(&QSpinBox::valueChanged), this, [this, i](int value) {
             int *fields[] = {&m_params.imgLineX1, &m_params.imgLineX2,
@@ -612,7 +612,7 @@ void ParamPage::buildImagingPage()
     btnLayout->setContentsMargins(6, 10, 6, 10);
     btnLayout->setSpacing(8);
 
-    m_scanBtn = new QPushButton("开始扫描");
+    m_scanBtn = new QPushButton(QString::fromUtf8("开始扫描"));
     m_scanBtn->setObjectName("StartScanButton");
     m_scanBtn->setFixedHeight(52);
     m_scanBtn->setCursor(Qt::PointingHandCursor);
@@ -636,7 +636,7 @@ void ParamPage::buildImagingPage()
     connect(m_scanBtn, &QPushButton::clicked, this, &ParamPage::onScanButtonClicked);
     btnLayout->addWidget(m_scanBtn);
 
-    auto *hintLabel = new QLabel("点击按钮开始/停止 C 扫描数据采集");
+    auto *hintLabel = new QLabel(QString::fromUtf8("点击按钮开始/停止 C 扫描数据采集"));
     hintLabel->setObjectName("HintLabel");
     hintLabel->setAlignment(Qt::AlignCenter);
     hintLabel->setMinimumWidth(0);
@@ -650,20 +650,20 @@ void ParamPage::buildImagingPage()
 
 void ParamPage::buildEncoderPage()
 {
-    auto *page = createCategoryPage("编码器参数");
+    auto *page = createCategoryPage(QString::fromUtf8("编码器参数"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
     auto *f = makeForm(form);
 
-    auto *direction = makeCombo({"正向", "反向"}, m_params.direction);
+    auto *direction = makeCombo({QString::fromUtf8("正向"), QString::fromUtf8("反向")}, m_params.direction);
     auto *coderDeg = makeDoubleSpin(0.001, 10.0, m_params.coderDeg, 0.01, "mm/p", 3);
     auto *checkDistance = makeDoubleSpin(1.0, 200.0, m_params.checkDistance, 0.1, "mm");
-    f->addRow("成像方向", direction);
-    f->addRow("编码精度", wrapWithStepSelector(coderDeg, {"0.001", "0.01", "0.1"}, {0.001, 0.01, 0.1}, 1));
-    f->addRow("校准距离", wrapWithStepSelector(checkDistance, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
+    f->addRow(QString::fromUtf8("成像方向"), direction);
+    f->addRow(QString::fromUtf8("编码精度"), wrapWithStepSelector(coderDeg, {"0.001", "0.01", "0.1"}, {0.001, 0.01, 0.1}, 1));
+    f->addRow(QString::fromUtf8("校准距离"), wrapWithStepSelector(checkDistance, {"0.1", "1.0", "10.0"}, {0.1, 1.0, 10.0}, 1));
 
-    m_encoderCalibrationBtn = new QPushButton("开始 / 结束校准");
+    m_encoderCalibrationBtn = new QPushButton(QString::fromUtf8("开始 / 结束校准"));
     auto *calBtn = m_encoderCalibrationBtn;
     calBtn->setFixedHeight(36);
     calBtn->setCursor(Qt::PointingHandCursor);
@@ -688,7 +688,7 @@ void ParamPage::buildEncoderPage()
 
 void ParamPage::buildAnalysisPage()
 {
-    auto *page = createCategoryPage("C扫分析参数");
+    auto *page = createCategoryPage(QString::fromUtf8("C扫分析参数"));
     auto *layout = qobject_cast<QVBoxLayout*>(page->property("contentLayout").value<QLayout*>());
 
     auto *form = new QGroupBox;
@@ -698,7 +698,7 @@ void ParamPage::buildAnalysisPage()
     m_analysisLineSpin[1] = makeIntSpin(0, 924, m_params.anaLineX2, 10);
     m_analysisLineSpin[2] = makeIntSpin(0, 249, m_params.anaLineY1, 10);
     m_analysisLineSpin[3] = makeIntSpin(0, 249, m_params.anaLineY2, 10);
-    const char *labels[] = {"测量线 X1", "测量线 X2", "测量线 Y1", "测量线 Y2"};
+    const char *labels[] = {"测量线 X1", "测量线 X2", "测量线 Y1","测量线 Y2"};
     for (int i = 0; i < 4; ++i) {
         f->addRow(labels[i], wrapWithStepSelector(m_analysisLineSpin[i], {"1", "10", "100"}, {1.0, 10.0, 100.0}, 1));
         connect(m_analysisLineSpin[i], QOverload<int>::of(&QSpinBox::valueChanged), this, [this, i](int value) {
@@ -715,14 +715,14 @@ void ParamPage::buildAnalysisPage()
         "QPushButton:hover{background:#126aa0;}"
     );
 
-    auto *pageBtn = new QPushButton("C扫翻页");
+    auto *pageBtn = new QPushButton(QString::fromUtf8("C扫翻页"));
     pageBtn->setFixedHeight(36);
     pageBtn->setCursor(Qt::PointingHandCursor);
     pageBtn->setStyleSheet(btnStyle);
     connect(pageBtn, &QPushButton::clicked, this, &ParamPage::cScanPageRequested);
     f->addRow("", pageBtn);
 
-    auto *exitBtn = new QPushButton("退出回放");
+    auto *exitBtn = new QPushButton(QString::fromUtf8("退出回放"));
     exitBtn->setFixedHeight(36);
     exitBtn->setCursor(Qt::PointingHandCursor);
     exitBtn->setStyleSheet(btnStyle);
@@ -738,7 +738,7 @@ void ParamPage::onScanButtonClicked()
 {
     m_scanning = !m_scanning;
     if (m_scanning) {
-        m_scanBtn->setText("停止扫描");
+        m_scanBtn->setText(QString::fromUtf8("停止扫描"));
         m_scanBtn->setStyleSheet(
             "QPushButton{"
             "  background:qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #c23a0a, stop:1 #e85020);"
@@ -757,7 +757,7 @@ void ParamPage::onScanButtonClicked()
         );
         emit scanStarted();
     } else {
-        m_scanBtn->setText("开始扫描");
+        m_scanBtn->setText(QString::fromUtf8("开始扫描"));
         m_scanBtn->setStyleSheet(
             "QPushButton{"
             "  background:qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #0a8a3a, stop:1 #0bc050);"
@@ -1209,45 +1209,45 @@ QJsonObject ParamPage::serializeParams() const
     j["pulseWidth"]    = p.pulseWidth;
     j["prf"]           = p.prf;
     j["range"]         = roundedJsonNumber(p.range, 1);
-    j["tempCorrect"]   = enumText(p.tempCorrect, {"关", "开"});
-    j["aDataLen"]      = enumText(p.aDataLen, {"100 点", "200 点", "400 点"});
+    j["tempCorrect"]   = enumText(p.tempCorrect, {QString::fromUtf8("关"), QString::fromUtf8("开")});
+    j["aDataLen"]      = enumText(p.aDataLen, {QString::fromUtf8("100 点"), QString::fromUtf8("200 点"), QString::fromUtf8("400 点")});
 
     // 接收
     j["aGain"]         = roundedJsonNumber(p.aGain, 1);
     j["dGain"]         = roundedJsonNumber(p.dGain, 1);
     j["curBeam"]       = p.curBeam;
-    j["rectify"]       = enumText(p.rectify, {"全波", "正半波", "负半波"});
+    j["rectify"]       = enumText(p.rectify, {QString::fromUtf8("全波"), QString::fromUtf8("正半波"), QString::fromUtf8("负半波")});
     j["filter"]        = enumText(p.filter, filterTexts());
-    j["video"]         = enumText(p.video, {"无", "1", "2", "3", "4", "平滑"});
+    j["video"]         = enumText(p.video, {QString::fromUtf8("无"), "1", "2", "3", "4", QString::fromUtf8("平滑")});
 
     // 闸门
-    j["gateSelect"]    = enumText(p.gateSelect, {"A 闸门", "B 闸门", "C 闸门"});
+    j["gateSelect"]    = enumText(p.gateSelect, {QString::fromUtf8("A 闸门"), QString::fromUtf8("B 闸门"), QString::fromUtf8("C 闸门")});
     j["gateStart"]     = floatsToJson(p.gateStart, 3, 1);
     j["gateWidth"]     = floatsToJson(p.gateWidth, 3, 1);
     j["gateThreshold"] = floatsToJson(p.gateThreshold, 3, 1);
-    j["gateMeasure"]   = enumsToJson(p.gateMeasure, 3, {"峰值", "前沿"});
-    j["alarmSound"]    = enumText(p.alarmSound, {"关", "A 门", "B 门", "AB 门"});
+    j["gateMeasure"]   = enumsToJson(p.gateMeasure, 3, {QString::fromUtf8("峰值"), QString::fromUtf8("前沿")});
+    j["alarmSound"]    = enumText(p.alarmSound, {QString::fromUtf8("关"), QString::fromUtf8("A 门"), QString::fromUtf8("B 门"), QString::fromUtf8("AB 门")});
 
     // 探头
-    j["probeType"]     = enumText(p.probeType, {"自定义", "2.5L16", "5.0S64"});
+    j["probeType"]     = enumText(p.probeType, {QString::fromUtf8("自定义"), "2.5L16", "5.0S64"});
     j["probeFreq"]     = roundedJsonNumber(p.probeFreq, 1);
     j["probeCount"]    = p.probeCount;
     j["probePitch"]    = roundedJsonNumber(p.probePitch, 2);
 
     // 楔块
-    j["wedgeEnable"]   = enumText(p.wedgeEnable, {"否", "是"});
-    j["wedgeType"]     = enumText(p.wedgeType, {"自定义", "GW-PA"});
+    j["wedgeEnable"]   = enumText(p.wedgeEnable, {QString::fromUtf8("否"), QString::fromUtf8("是")});
+    j["wedgeType"]     = enumText(p.wedgeType, {QString::fromUtf8("自定义"), "GW-PA"});
     j["wedgeAngle"]    = roundedJsonNumber(p.wedgeAngle, 1);
     j["wedgeVelocity"] = p.wedgeVelocity;
     j["wedgeHeight"]   = roundedJsonNumber(p.wedgeHeight, 1);
 
     // 工件
-    j["material"]      = enumText(p.material, {"钢纵波", "钢横波"});
+    j["material"]      = enumText(p.material, {QString::fromUtf8("钢纵波"), QString::fromUtf8("钢横波")});
     j["lVelocity"]     = p.lVelocity;
-    j["traceEnable"]   = enumText(p.traceEnable, {"否", "是"});
+    j["traceEnable"]   = enumText(p.traceEnable, {QString::fromUtf8("否"), QString::fromUtf8("是")});
 
     // 扫查
-    j["scanType"]      = enumText(p.scanType, {"S 扫", "L 扫"});
+    j["scanType"]      = enumText(p.scanType, {QString::fromUtf8("S 扫"), QString::fromUtf8("L 扫")});
     j["eleStart"]      = p.eleStart;
     j["eleEnd"]        = p.eleEnd;
     j["eleAperture"]   = p.eleAperture;
@@ -1264,20 +1264,20 @@ QJsonObject ParamPage::serializeParams() const
     j["degPerPoint"]   = roundedJsonNumber(p.degPerPoint, 1);
 
     // 编码器
-    j["direction"]     = enumText(p.direction, {"正向", "反向"});
+    j["direction"]     = enumText(p.direction, {QString::fromUtf8("正向"), QString::fromUtf8("反向")});
     j["coderDeg"]      = roundedJsonNumber(p.coderDeg, 3);
     j["checkDistance"] = roundedJsonNumber(p.checkDistance, 1);
 
     // 校准 (TCG)
-    j["calibItem"]     = enumText(p.calibItem, {"声速", "声束延迟", "ACG", "TCG"});
+    j["calibItem"]     = enumText(p.calibItem, {QString::fromUtf8("声速"), QString::fromUtf8("声束延迟"), "ACG", "TCG"});
     j["realDistance"]  = roundedJsonNumber(p.realDistance, 1);
     j["beamDelay"]     = roundedJsonNumber(p.beamDelay, 1);
     j["tcgCoeff"]      = roundedJsonNumber(p.tcgCoeff, 3);
-    j["calibEnable"]   = enumText(p.calibEnable, {"关闭", "ACG"});
+    j["calibEnable"]   = enumText(p.calibEnable, {QString::fromUtf8("关闭"), "ACG"});
     j["tcgStart"]      = p.tcgStart;
     j["tcgEnd"]        = p.tcgEnd;
-    j["acgSwitch"]     = enumText(p.acgSwitch, {"关", "开"});
-    j["tcgSwitch"]     = enumText(p.tcgSwitch, {"关", "开"});
+    j["acgSwitch"]     = enumText(p.acgSwitch, {QString::fromUtf8("关"), QString::fromUtf8("开")});
+    j["tcgSwitch"]     = enumText(p.tcgSwitch, {QString::fromUtf8("关"), QString::fromUtf8("开")});
     j["tcgX"]          = floatsToJson(p.tcgX, 6);
     j["tcgRatio"]      = floatsToJson(p.tcgRatio, 6);
     j["acgValue"]      = floatsToJson(p.acgValue, 128);
@@ -1291,8 +1291,8 @@ QJsonObject ParamPage::serializeParams() const
     j["diameter"]      = p.diameter;
 
     // 闸门独立报警/跟踪
-    j["gateAlarm"]     = enumsToJson(p.gateAlarm, 3, {"关", "开"});
-    j["gateTrace"]     = enumsToJson(p.gateTrace, 3, {"关", "开"});
+    j["gateAlarm"]     = enumsToJson(p.gateAlarm, 3, {QString::fromUtf8("关"), QString::fromUtf8("开")});
+    j["gateTrace"]     = enumsToJson(p.gateTrace, 3, {QString::fromUtf8("关"), QString::fromUtf8("开")});
 
     // 探头延迟
     j["probeDelay"]    = roundedJsonNumber(p.probeDelay, 3);
@@ -1340,88 +1340,88 @@ QJsonObject ParamPage::serializeParams() const
     // Keep the file valid JSON while documenting every persisted parameter.
     // Older PA versions ignore this object, so annotated files remain compatible.
     QJsonObject comments;
-    comments["highVoltage"] = "发射电压档位";
-    comments["pulseWidth"] = "发射脉冲宽度";
-    comments["prf"] = "脉冲重复频率";
-    comments["range"] = "A扫检测范围";
-    comments["tempCorrect"] = "温度补偿开关";
-    comments["aDataLen"] = "A扫数据长度";
-    comments["aGain"] = "模拟增益";
-    comments["dGain"] = "数字增益";
-    comments["curBeam"] = "当前声束编号";
-    comments["rectify"] = "检波方式";
-    comments["filter"] = "滤波档位";
-    comments["video"] = "视频滤波开关";
-    comments["gateSelect"] = "当前选中的闸门，0=A、1=B、2=C";
-    comments["gateStart"] = "A/B/C闸门起始位置数组";
-    comments["gateWidth"] = "A/B/C闸门宽度数组";
-    comments["gateThreshold"] = "A/B/C闸门阈值数组";
-    comments["gateMeasure"] = "A/B/C闸门测量方式数组";
-    comments["gateAlarm"] = "A/B/C闸门报警方式数组";
-    comments["gateTrace"] = "A/B/C闸门跟踪方式数组";
-    comments["alarmSound"] = "报警声音开关";
-    comments["probeType"] = "探头类型";
-    comments["probeFreq"] = "探头中心频率";
-    comments["probeCount"] = "探头阵元数量";
-    comments["probePitch"] = "探头阵元间距";
-    comments["probeDelay"] = "探头延迟";
-    comments["wedgeEnable"] = "楔块启用开关";
-    comments["wedgeType"] = "楔块类型";
-    comments["wedgeAngle"] = "楔块角度";
-    comments["wedgeVelocity"] = "楔块声速";
-    comments["wedgeHeight"] = "楔块高度";
-    comments["material"] = "工件材料类型";
-    comments["lVelocity"] = "工件纵波声速";
-    comments["sVelocity"] = "工件横波声速";
-    comments["diameter"] = "工件直径";
-    comments["traceEnable"] = "轨迹显示开关";
-    comments["scanType"] = "扫描类型";
-    comments["eleStart"] = "起始阵元";
-    comments["eleEnd"] = "结束阵元";
-    comments["eleAperture"] = "有效孔径阵元数";
-    comments["angleFrom"] = "扫描起始角度";
-    comments["angleTo"] = "扫描终止角度";
-    comments["angle"] = "固定扫描角度";
-    comments["focus"] = "聚焦深度";
-    comments["imgLineX1"] = "C扫成像X方向起始线";
-    comments["imgLineX2"] = "C扫成像X方向终止线";
-    comments["imgLineY1"] = "C扫成像Y方向起始线";
-    comments["imgLineY2"] = "C扫成像Y方向终止线";
-    comments["degPerPoint"] = "C扫每采样点对应角度";
-    comments["imgSpanStart"] = "C扫成像跨度起点";
-    comments["imgSpanEnd"] = "C扫成像跨度终点";
-    comments["direction"] = "编码器运动方向";
-    comments["coderDeg"] = "编码器每点角度";
-    comments["checkDistance"] = "检测距离";
-    comments["circleDeg"] = "编码器一周计数";
-    comments["calibItem"] = "当前校准项目";
-    comments["realDistance"] = "校准实际距离";
-    comments["beamDelay"] = "声束延迟";
-    comments["tcgCoeff"] = "TCG补偿系数";
-    comments["calibEnable"] = "校准启用开关";
-    comments["tcgStart"] = "TCG起始点";
-    comments["tcgEnd"] = "TCG终止点";
-    comments["acgSwitch"] = "ACG开关";
-    comments["tcgSwitch"] = "TCG开关";
-    comments["tcgX"] = "TCG控制点位置数组";
-    comments["tcgRatio"] = "TCG控制点增益比例数组";
-    comments["acgValue"] = "各声束ACG值数组";
-    comments["tcgPointX"] = "各声束TCG点位置数组";
-    comments["tcgPointValue"] = "各声束TCG点增益数组";
-    comments["dimX"] = "TFM成像X尺寸";
-    comments["dimY"] = "TFM成像Y尺寸";
-    comments["offsetX"] = "TFM成像X偏移";
-    comments["offsetY"] = "TFM成像Y偏移";
-    comments["pixelSize"] = "TFM像素尺寸";
-    comments["pieceThickness"] = "工件厚度";
-    comments["tfmDGain"] = "TFM数字增益";
-    comments["tfmSmooth"] = "TFM平滑参数";
-    comments["parRestrainH16"] = "TFM高16位抑制参数";
-    comments["parRestrainL16"] = "TFM低16位抑制参数";
-    comments["readNum"] = "全局读取序号";
-    comments["beamCount"] = "有效声束数量";
-    comments["tempBeamCount"] = "临时声束数量";
-    comments["beams"] = "非零声束几何描述，i为编号，x0/y0和x1/y1为端点";
+    comments["highVoltage"] = QString::fromUtf8("发射电压档位");
+    comments["pulseWidth"] = QString::fromUtf8("发射脉冲宽度");
+    comments["prf"] = QString::fromUtf8("脉冲重复频率");
+    comments["range"] = QString::fromUtf8("A扫检测范围");
+    comments["tempCorrect"] = QString::fromUtf8("温度补偿开关");
+    comments["aDataLen"] = QString::fromUtf8("A扫数据长度");
+    comments["aGain"] = QString::fromUtf8("模拟增益");
+    comments["dGain"] = QString::fromUtf8("数字增益");
+    comments["curBeam"] = QString::fromUtf8("当前声束编号");
+    comments["rectify"] = QString::fromUtf8("检波方式");
+    comments["filter"] = QString::fromUtf8("滤波档位");
+    comments["video"] = QString::fromUtf8("视频滤波开关");
+    comments["gateSelect"] = QString::fromUtf8("当前选中的闸门，0=A、1=B、2=C");
+    comments["gateStart"] = QString::fromUtf8("A/B/C闸门起始位置数组");
+    comments["gateWidth"] = QString::fromUtf8("A/B/C闸门宽度数组");
+    comments["gateThreshold"] = QString::fromUtf8("A/B/C闸门阈值数组");
+    comments["gateMeasure"] = QString::fromUtf8("A/B/C闸门测量方式数组");
+    comments["gateAlarm"] = QString::fromUtf8("A/B/C闸门报警方式数组");
+    comments["gateTrace"] = QString::fromUtf8("A/B/C闸门跟踪方式数组");
+    comments["alarmSound"] = QString::fromUtf8("报警声音开关");
+    comments["probeType"] = QString::fromUtf8("探头类型");
+    comments["probeFreq"] = QString::fromUtf8("探头中心频率");
+    comments["probeCount"] = QString::fromUtf8("探头阵元数量");
+    comments["probePitch"] = QString::fromUtf8("探头阵元间距");
+    comments["probeDelay"] = QString::fromUtf8("探头延迟");
+    comments["wedgeEnable"] = QString::fromUtf8("楔块启用开关");
+    comments["wedgeType"] = QString::fromUtf8("楔块类型");
+    comments["wedgeAngle"] = QString::fromUtf8("楔块角度");
+    comments["wedgeVelocity"] = QString::fromUtf8("楔块声速");
+    comments["wedgeHeight"] = QString::fromUtf8("楔块高度");
+    comments["material"] = QString::fromUtf8("工件材料类型");
+    comments["lVelocity"] = QString::fromUtf8("工件纵波声速");
+    comments["sVelocity"] = QString::fromUtf8("工件横波声速");
+    comments["diameter"] = QString::fromUtf8("工件直径");
+    comments["traceEnable"] = QString::fromUtf8("轨迹显示开关");
+    comments["scanType"] = QString::fromUtf8("扫描类型");
+    comments["eleStart"] = QString::fromUtf8("起始阵元");
+    comments["eleEnd"] = QString::fromUtf8("结束阵元");
+    comments["eleAperture"] = QString::fromUtf8("有效孔径阵元数");
+    comments["angleFrom"] = QString::fromUtf8("扫描起始角度");
+    comments["angleTo"] = QString::fromUtf8("扫描终止角度");
+    comments["angle"] = QString::fromUtf8("固定扫描角度");
+    comments["focus"] = QString::fromUtf8("聚焦深度");
+    comments["imgLineX1"] = QString::fromUtf8("C扫成像X方向起始线");
+    comments["imgLineX2"] = QString::fromUtf8("C扫成像X方向终止线");
+    comments["imgLineY1"] = QString::fromUtf8("C扫成像Y方向起始线");
+    comments["imgLineY2"] = QString::fromUtf8("C扫成像Y方向终止线");
+    comments["degPerPoint"] = QString::fromUtf8("C扫每采样点对应角度");
+    comments["imgSpanStart"] = QString::fromUtf8("C扫成像跨度起点");
+    comments["imgSpanEnd"] = QString::fromUtf8("C扫成像跨度终点");
+    comments["direction"] = QString::fromUtf8("编码器运动方向");
+    comments["coderDeg"] = QString::fromUtf8("编码器每点角度");
+    comments["checkDistance"] = QString::fromUtf8("检测距离");
+    comments["circleDeg"] = QString::fromUtf8("编码器一周计数");
+    comments["calibItem"] = QString::fromUtf8("当前校准项目");
+    comments["realDistance"] = QString::fromUtf8("校准实际距离");
+    comments["beamDelay"] = QString::fromUtf8("声束延迟");
+    comments["tcgCoeff"] = QString::fromUtf8("TCG补偿系数");
+    comments["calibEnable"] = QString::fromUtf8("校准启用开关");
+    comments["tcgStart"] = QString::fromUtf8("TCG起始点");
+    comments["tcgEnd"] = QString::fromUtf8("TCG终止点");
+    comments["acgSwitch"] = QString::fromUtf8("ACG开关");
+    comments["tcgSwitch"] = QString::fromUtf8("TCG开关");
+    comments["tcgX"] = QString::fromUtf8("TCG控制点位置数组");
+    comments["tcgRatio"] = QString::fromUtf8("TCG控制点增益比例数组");
+    comments["acgValue"] = QString::fromUtf8("各声束ACG值数组");
+    comments["tcgPointX"] = QString::fromUtf8("各声束TCG点位置数组");
+    comments["tcgPointValue"] = QString::fromUtf8("各声束TCG点增益数组");
+    comments["dimX"] = QString::fromUtf8("TFM成像X尺寸");
+    comments["dimY"] = QString::fromUtf8("TFM成像Y尺寸");
+    comments["offsetX"] = QString::fromUtf8("TFM成像X偏移");
+    comments["offsetY"] = QString::fromUtf8("TFM成像Y偏移");
+    comments["pixelSize"] = QString::fromUtf8("TFM像素尺寸");
+    comments["pieceThickness"] = QString::fromUtf8("工件厚度");
+    comments["tfmDGain"] = QString::fromUtf8("TFM数字增益");
+    comments["tfmSmooth"] = QString::fromUtf8("TFM平滑参数");
+    comments["parRestrainH16"] = QString::fromUtf8("TFM高16位抑制参数");
+    comments["parRestrainL16"] = QString::fromUtf8("TFM低16位抑制参数");
+    comments["readNum"] = QString::fromUtf8("全局读取序号");
+    comments["beamCount"] = QString::fromUtf8("有效声束数量");
+    comments["tempBeamCount"] = QString::fromUtf8("临时声束数量");
+    comments["beams"] = QString::fromUtf8("非零声束几何描述，i为编号，x0/y0和x1/y1为端点");
     j["_comments"] = comments;
 
     return j;
@@ -1436,45 +1436,45 @@ void ParamPage::deserializeParams(const QJsonObject &j)
     if (j.contains("pulseWidth"))    p.pulseWidth    = j["pulseWidth"].toInt();
     if (j.contains("prf"))           p.prf           = j["prf"].toInt();
     if (j.contains("range"))         p.range         = static_cast<float>(j["range"].toDouble());
-    if (j.contains("tempCorrect"))   p.tempCorrect   = enumIndex(j["tempCorrect"], {"关", "开"}, p.tempCorrect);
-    if (j.contains("aDataLen"))      p.aDataLen      = enumIndex(j["aDataLen"], {"100 点", "200 点", "400 点"}, p.aDataLen);
+    if (j.contains("tempCorrect"))   p.tempCorrect   = enumIndex(j["tempCorrect"], {QString::fromUtf8("关"), QString::fromUtf8("开")}, p.tempCorrect);
+    if (j.contains("aDataLen"))      p.aDataLen      = enumIndex(j["aDataLen"], {QString::fromUtf8("100 点"), QString::fromUtf8("200 点"), QString::fromUtf8("400 点")}, p.aDataLen);
 
     // 接收
     if (j.contains("aGain"))         p.aGain         = static_cast<float>(j["aGain"].toDouble());
     if (j.contains("dGain"))         p.dGain         = static_cast<float>(j["dGain"].toDouble());
     if (j.contains("curBeam"))       p.curBeam       = j["curBeam"].toInt();
-    if (j.contains("rectify"))       p.rectify       = enumIndex(j["rectify"], {"全波", "正半波", "负半波"}, p.rectify);
+    if (j.contains("rectify"))       p.rectify       = enumIndex(j["rectify"], {QString::fromUtf8("全波"), QString::fromUtf8("正半波"), QString::fromUtf8("负半波")}, p.rectify);
     if (j.contains("filter"))        p.filter        = enumIndex(j["filter"], filterTexts(), p.filter);
-    if (j.contains("video"))         p.video         = enumIndex(j["video"], {"无", "1", "2", "3", "4", "平滑"}, p.video);
+    if (j.contains("video"))         p.video         = enumIndex(j["video"], {QString::fromUtf8("无"), "1", "2", "3", "4", QString::fromUtf8("平滑")}, p.video);
 
     // 闸门
-    if (j.contains("gateSelect"))    p.gateSelect    = enumIndex(j["gateSelect"], {"A 闸门", "B 闸门", "C 闸门"}, p.gateSelect);
+    if (j.contains("gateSelect"))    p.gateSelect    = enumIndex(j["gateSelect"], {QString::fromUtf8("A 闸门"), QString::fromUtf8("B 闸门"), QString::fromUtf8("C 闸门")}, p.gateSelect);
     if (j.contains("gateStart"))     jsonToFloats(j["gateStart"].toArray(), p.gateStart, 3);
     if (j.contains("gateWidth"))     jsonToFloats(j["gateWidth"].toArray(), p.gateWidth, 3);
     if (j.contains("gateThreshold")) jsonToFloats(j["gateThreshold"].toArray(), p.gateThreshold, 3);
-    if (j.contains("gateMeasure"))   jsonToEnums(j["gateMeasure"].toArray(), p.gateMeasure, 3, {"峰值", "前沿"});
-    if (j.contains("alarmSound"))    p.alarmSound    = enumIndex(j["alarmSound"], {"关", "A 门", "B 门", "AB 门"}, p.alarmSound);
+    if (j.contains("gateMeasure"))   jsonToEnums(j["gateMeasure"].toArray(), p.gateMeasure, 3, {QString::fromUtf8("峰值"), QString::fromUtf8("前沿")});
+    if (j.contains("alarmSound"))    p.alarmSound    = enumIndex(j["alarmSound"], {QString::fromUtf8("关"), QString::fromUtf8("A 门"), QString::fromUtf8("B 门"), QString::fromUtf8("AB 门")}, p.alarmSound);
 
     // 探头
-    if (j.contains("probeType"))     p.probeType     = enumIndex(j["probeType"], {"自定义", "2.5L16", "5.0S64"}, p.probeType);
+    if (j.contains("probeType"))     p.probeType     = enumIndex(j["probeType"], {QString::fromUtf8("自定义"), "2.5L16", "5.0S64"}, p.probeType);
     if (j.contains("probeFreq"))     p.probeFreq     = static_cast<float>(j["probeFreq"].toDouble());
     if (j.contains("probeCount"))    p.probeCount    = j["probeCount"].toInt();
     if (j.contains("probePitch"))    p.probePitch    = static_cast<float>(j["probePitch"].toDouble());
 
     // 楔块
-    if (j.contains("wedgeEnable"))   p.wedgeEnable   = enumIndex(j["wedgeEnable"], {"否", "是"}, p.wedgeEnable);
-    if (j.contains("wedgeType"))     p.wedgeType     = enumIndex(j["wedgeType"], {"自定义", "GW-PA"}, p.wedgeType);
+    if (j.contains("wedgeEnable"))   p.wedgeEnable   = enumIndex(j["wedgeEnable"], {QString::fromUtf8("否"), QString::fromUtf8("是")}, p.wedgeEnable);
+    if (j.contains("wedgeType"))     p.wedgeType     = enumIndex(j["wedgeType"], {QString::fromUtf8("自定义"), "GW-PA"}, p.wedgeType);
     if (j.contains("wedgeAngle"))    p.wedgeAngle    = static_cast<float>(j["wedgeAngle"].toDouble());
     if (j.contains("wedgeVelocity")) p.wedgeVelocity = j["wedgeVelocity"].toInt();
     if (j.contains("wedgeHeight"))   p.wedgeHeight   = static_cast<float>(j["wedgeHeight"].toDouble());
 
     // 工件
-    if (j.contains("material"))      p.material      = enumIndex(j["material"], {"钢纵波", "钢横波"}, p.material);
+    if (j.contains("material"))      p.material      = enumIndex(j["material"], {QString::fromUtf8("钢纵波"), QString::fromUtf8("钢横波")}, p.material);
     if (j.contains("lVelocity"))     p.lVelocity     = j["lVelocity"].toInt();
-    if (j.contains("traceEnable"))   p.traceEnable   = enumIndex(j["traceEnable"], {"否", "是"}, p.traceEnable);
+    if (j.contains("traceEnable"))   p.traceEnable   = enumIndex(j["traceEnable"], {QString::fromUtf8("否"), QString::fromUtf8("是")}, p.traceEnable);
 
     // 扫查
-    if (j.contains("scanType"))      p.scanType      = enumIndex(j["scanType"], {"S 扫", "L 扫"}, p.scanType);
+    if (j.contains("scanType"))      p.scanType      = enumIndex(j["scanType"], {QString::fromUtf8("S 扫"), QString::fromUtf8("L 扫")}, p.scanType);
     if (j.contains("eleStart"))      p.eleStart      = j["eleStart"].toInt();
     if (j.contains("eleEnd"))        p.eleEnd        = j["eleEnd"].toInt();
     if (j.contains("eleAperture"))   p.eleAperture   = j["eleAperture"].toInt();
@@ -1491,20 +1491,20 @@ void ParamPage::deserializeParams(const QJsonObject &j)
     if (j.contains("degPerPoint"))   p.degPerPoint   = static_cast<float>(j["degPerPoint"].toDouble());
 
     // 编码器
-    if (j.contains("direction"))     p.direction     = enumIndex(j["direction"], {"正向", "反向"}, p.direction);
+    if (j.contains("direction"))     p.direction     = enumIndex(j["direction"], {QString::fromUtf8("正向"), QString::fromUtf8("反向")}, p.direction);
     if (j.contains("coderDeg"))      p.coderDeg      = static_cast<float>(j["coderDeg"].toDouble());
     if (j.contains("checkDistance")) p.checkDistance = static_cast<float>(j["checkDistance"].toDouble());
 
     // 校准
-    if (j.contains("calibItem"))     p.calibItem     = enumIndex(j["calibItem"], {"声速", "声束延迟", "ACG", "TCG"}, p.calibItem);
+    if (j.contains("calibItem"))     p.calibItem     = enumIndex(j["calibItem"], {QString::fromUtf8("声速"), QString::fromUtf8("声束延迟"), "ACG", "TCG"}, p.calibItem);
     if (j.contains("realDistance"))  p.realDistance  = static_cast<float>(j["realDistance"].toDouble());
     if (j.contains("beamDelay"))     p.beamDelay     = static_cast<float>(j["beamDelay"].toDouble());
     if (j.contains("tcgCoeff"))      p.tcgCoeff      = static_cast<float>(j["tcgCoeff"].toDouble());
-    if (j.contains("calibEnable"))   p.calibEnable   = enumIndex(j["calibEnable"], {"关闭", "ACG"}, p.calibEnable);
+    if (j.contains("calibEnable"))   p.calibEnable   = enumIndex(j["calibEnable"], {QString::fromUtf8("关闭"), "ACG"}, p.calibEnable);
     if (j.contains("tcgStart"))      p.tcgStart      = j["tcgStart"].toInt();
     if (j.contains("tcgEnd"))        p.tcgEnd        = j["tcgEnd"].toInt();
-    if (j.contains("acgSwitch"))     p.acgSwitch     = enumIndex(j["acgSwitch"], {"关", "开"}, p.acgSwitch);
-    if (j.contains("tcgSwitch"))     p.tcgSwitch     = enumIndex(j["tcgSwitch"], {"关", "开"}, p.tcgSwitch);
+    if (j.contains("acgSwitch"))     p.acgSwitch     = enumIndex(j["acgSwitch"], {QString::fromUtf8("关"), QString::fromUtf8("开")}, p.acgSwitch);
+    if (j.contains("tcgSwitch"))     p.tcgSwitch     = enumIndex(j["tcgSwitch"], {QString::fromUtf8("关"), QString::fromUtf8("开")}, p.tcgSwitch);
     if (j.contains("tcgX"))          jsonToFloats(j["tcgX"].toArray(), p.tcgX, 6);
     if (j.contains("tcgRatio"))      jsonToFloats(j["tcgRatio"].toArray(), p.tcgRatio, 6);
     if (j.contains("acgValue"))      jsonToFloats(j["acgValue"].toArray(), p.acgValue, 128);
@@ -1514,8 +1514,8 @@ void ParamPage::deserializeParams(const QJsonObject &j)
     // ── MFC 补齐字段 ──
     if (j.contains("sVelocity"))     p.sVelocity     = j["sVelocity"].toInt();
     if (j.contains("diameter"))      p.diameter      = j["diameter"].toInt();
-    if (j.contains("gateAlarm"))     jsonToEnums(j["gateAlarm"].toArray(), p.gateAlarm, 3, {"关", "开"});
-    if (j.contains("gateTrace"))     jsonToEnums(j["gateTrace"].toArray(), p.gateTrace, 3, {"关", "开"});
+    if (j.contains("gateAlarm"))     jsonToEnums(j["gateAlarm"].toArray(), p.gateAlarm, 3, {QString::fromUtf8("关"), QString::fromUtf8("开")});
+    if (j.contains("gateTrace"))     jsonToEnums(j["gateTrace"].toArray(), p.gateTrace, 3, {QString::fromUtf8("关"), QString::fromUtf8("开")});
     if (j.contains("probeDelay"))    p.probeDelay    = static_cast<float>(j["probeDelay"].toDouble());
     if (j.contains("dimX"))          p.dimX          = static_cast<float>(j["dimX"].toDouble());
     if (j.contains("dimY"))          p.dimY          = static_cast<float>(j["dimY"].toDouble());
@@ -1693,13 +1693,9 @@ void ParamPage::onSaveParams()
     m_params.gateTrace[gate] = m_gateTraceCombo->currentIndex();
 
     QString path = QFileDialog::getSaveFileName(
-        this, "保存参数", paramsDir(),
-        "参数文件 (*.json);;MFC参数文件 (*.par);;所有文件 (*)");
+        this, QString::fromUtf8("保存参数"), paramsDir(),
+        QString::fromUtf8("参数文件 (*.json);;所有文件 (*)"));
     if (path.isEmpty()) return;
-    if (path.endsWith(".par", Qt::CaseInsensitive)) {
-        emit legacyParamsSaveRequested(path);
-        return;
-    }
 
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly)) return;
@@ -1711,13 +1707,9 @@ void ParamPage::onSaveParams()
 void ParamPage::onLoadParams()
 {
     QString path = QFileDialog::getOpenFileName(
-        this, "调用参数", paramsDir(),
-        "参数文件 (*.json *.ini *.param);;MFC参数文件 (*.par);;所有文件 (*)");
+        this, QString::fromUtf8("调用参数"), paramsDir(),
+        QString::fromUtf8("参数文件 (*.json);;所有文件 (*)"));
     if (path.isEmpty()) return;
-    if (path.endsWith(".par", Qt::CaseInsensitive)) {
-        emit legacyParamsLoadRequested(path);
-        return;
-    }
 
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) return;
@@ -1757,23 +1749,18 @@ void ParamPage::updateCScanButtons()
 
 void ParamPage::onSaveData()
 {
-    QString selectedFilter;
     QString path = QFileDialog::getSaveFileName(
-        this, "保存C扫数据", dataDir(),
-        "PA数据 (*.dat);;MFC兼容数据 (*.dat);;MFC CSV数据 (*.csv);;所有文件 (*)",
-        &selectedFilter);
+        this, QString::fromUtf8("保存C扫数据"), dataDir(),
+        QString::fromUtf8("PA数据 (*.dat);;所有文件 (*)"));
     if (path.isEmpty()) return;
-    if (selectedFilter.startsWith("MFC兼容数据"))
-        emit saveLegacyDataRequested(path);
-    else
-        emit saveDataRequested(path);
+    emit saveDataRequested(path);
 }
 
 void ParamPage::onReplayData()
 {
     QString path = QFileDialog::getOpenFileName(
-        this, "回放C扫数据", dataDir(),
-        "C扫数据 (*.dat);;所有文件 (*)");
+        this, QString::fromUtf8("回放C扫数据"), dataDir(),
+        QString::fromUtf8("C扫数据 (*.dat);;所有文件 (*)"));
     if (path.isEmpty()) return;
     emit replayDataRequested(path);
 }
@@ -1804,12 +1791,12 @@ void ParamPage::setupUi()
     sideLayout->setSpacing(0);
 
     // 顶部标题
-    auto *topLabel = new QLabel("参数设置");
+    auto *topLabel = new QLabel(QString::fromUtf8("参数设置"));
     topLabel->setObjectName("SidebarTitle");
     topLabel->setAlignment(Qt::AlignCenter);
     sideLayout->addWidget(topLabel);
 
-    auto *subLabel = new QLabel("常规相控阵参数");
+    auto *subLabel = new QLabel(QString::fromUtf8("常规相控阵参数"));
     subLabel->setObjectName("PageLabel");
     subLabel->setAlignment(Qt::AlignCenter);
     sideLayout->addWidget(subLabel);
@@ -1817,8 +1804,8 @@ void ParamPage::setupUi()
     // 导航列表（11项：8项参数 + 3项C扫）
     m_nav = new QListWidget;
     m_nav->setObjectName("ParamNav");
-    const QStringList cats = {"发射", "接收", "闸门", "探头", "楔块", "工件", "扫查", "校准",
-                               "成像", "编码器", "分析"};
+    const QStringList cats = {QString::fromUtf8("发射"), QString::fromUtf8("接收"), QString::fromUtf8("闸门"), QString::fromUtf8("探头"), QString::fromUtf8("楔块"), QString::fromUtf8("工件"), QString::fromUtf8("扫查"), QString::fromUtf8("校准"),
+                               QString::fromUtf8("成像"), QString::fromUtf8("编码器"), QString::fromUtf8("分析")};
     for (const auto &c : cats)
         m_nav->addItem(c);
     m_nav->setCurrentRow(0);
@@ -1829,27 +1816,27 @@ void ParamPage::setupUi()
     btnLayout->setContentsMargins(8, 6, 8, 8);
     btnLayout->setSpacing(5);
 
-    auto *applyBtn = new QPushButton("应用法则");
+    auto *applyBtn = new QPushButton(QString::fromUtf8("应用法则"));
     applyBtn->setObjectName("ApplyLawButton");
     applyBtn->setCursor(Qt::PointingHandCursor);
     applyBtn->setFixedHeight(34);
     connect(applyBtn, &QPushButton::clicked, this, &ParamPage::onApplyLaw);
 
-    auto *saveBtn = new QPushButton("保存参数");
+    auto *saveBtn = new QPushButton(QString::fromUtf8("保存参数"));
     saveBtn->setObjectName("SaveButton");
     saveBtn->setCursor(Qt::PointingHandCursor);
     saveBtn->setFixedHeight(30);
     connect(saveBtn, &QPushButton::clicked, this, &ParamPage::onSaveParams);
 
 	// ── C扫数据按钮（默认置灰，在成像/编码器/分析页解锁）──
-	m_saveDataBtn = new QPushButton("保存数据");
+	m_saveDataBtn = new QPushButton(QString::fromUtf8("保存数据"));
 	m_saveDataBtn->setObjectName("SaveDataButton");
 	m_saveDataBtn->setCursor(Qt::PointingHandCursor);
 	m_saveDataBtn->setFixedHeight(30);
 	m_saveDataBtn->setEnabled(false);
 	connect(m_saveDataBtn, &QPushButton::clicked, this, &ParamPage::onSaveData);
 
-	m_replayDataBtn = new QPushButton("回放数据");
+	m_replayDataBtn = new QPushButton(QString::fromUtf8("回放数据"));
 	m_replayDataBtn->setObjectName("ReplayDataButton");
 	m_replayDataBtn->setCursor(Qt::PointingHandCursor);
 	m_replayDataBtn->setFixedHeight(30);

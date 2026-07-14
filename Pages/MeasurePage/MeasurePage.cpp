@@ -18,16 +18,16 @@ MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
     layout->setSpacing(4);
 
     // ── 读数项 ──
-    m_beamReading       = new ReadingItem("声束号",   "",   "0",    "#f2fbff");
-    m_gainReading       = new ReadingItem("模拟增益", "dB", "18.0", "#f2fbff");
-    m_gateAAmpReading   = new ReadingItem("A门幅度",  "%",  "--",   "#ff4444");
-    m_gateAPathReading  = new ReadingItem("A门声程",  "mm", "--",   "#f2fbff");
-    m_gateBAmpReading   = new ReadingItem("B门幅度",  "%",  "--",   "#1eea36");
-    m_gateBPathReading  = new ReadingItem("B门声程",  "mm", "--",   "#f2fbff");
-    m_aHorizontalReading = new ReadingItem("A水平",   "mm", "--",   "#1eea36");
-    m_aVerticalReading  = new ReadingItem("A垂直",    "mm", "--",   "#1eea36");
-    m_bHorizontalReading = new ReadingItem("B水平",   "mm", "--",   "#1eea36");
-    m_bVerticalReading  = new ReadingItem("B垂直",    "mm", "--",   "#1eea36");
+    m_beamReading       = new ReadingItem(QString::fromUtf8("声束号"),   "",   "0",    "#f2fbff");
+    m_gainReading       = new ReadingItem(QString::fromUtf8("模拟增益"), "dB", "18.0", "#f2fbff");
+    m_gateAAmpReading   = new ReadingItem(QString::fromUtf8("A门幅度"),  "%",  "--",   "#ff4444");
+    m_gateAPathReading  = new ReadingItem(QString::fromUtf8("A门声程"),  "mm", "--",   "#f2fbff");
+    m_gateBAmpReading   = new ReadingItem(QString::fromUtf8("B门幅度"),  "%",  "--",   "#1eea36");
+    m_gateBPathReading  = new ReadingItem(QString::fromUtf8("B门声程"),  "mm", "--",   "#f2fbff");
+    m_aHorizontalReading = new ReadingItem(QString::fromUtf8("A水平"),   "mm", "--",   "#1eea36");
+    m_aVerticalReading  = new ReadingItem(QString::fromUtf8("A垂直"),    "mm", "--",   "#1eea36");
+    m_bHorizontalReading = new ReadingItem(QString::fromUtf8("B水平"),   "mm", "--",   "#1eea36");
+    m_bVerticalReading  = new ReadingItem(QString::fromUtf8("B垂直"),    "mm", "--",   "#1eea36");
 
     layout->addWidget(m_beamReading);
     layout->addWidget(m_gainReading);
@@ -60,13 +60,13 @@ MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
     layout->addWidget(sep3);
 
     // ── 操作按钮 ──
-    m_loadParamsBtn = new QPushButton("调用参数");
+    m_loadParamsBtn = new QPushButton(QString::fromUtf8("调用参数"));
     m_loadParamsBtn->setObjectName("LoadParamsBtn");
     m_loadParamsBtn->setCursor(Qt::PointingHandCursor);
     m_loadParamsBtn->setFixedHeight(30);
     connect(m_loadParamsBtn, &QPushButton::clicked, this, &MeasurePage::loadParamsRequested);
 
-    m_freezeBtn = new QPushButton("冻结");
+    m_freezeBtn = new QPushButton(QString::fromUtf8("冻结"));
     m_freezeBtn->setObjectName("FreezeBtn");
     m_freezeBtn->setCursor(Qt::PointingHandCursor);
     m_freezeBtn->setFixedHeight(30);
@@ -75,20 +75,20 @@ MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
         emit freezeChanged(m_frozen);
     });
 
-    m_screenshotBtn = new QPushButton("截屏");
+    m_screenshotBtn = new QPushButton(QString::fromUtf8("截屏"));
     m_screenshotBtn->setObjectName("ScreenshotBtn");
     m_screenshotBtn->setCursor(Qt::PointingHandCursor);
     m_screenshotBtn->setFixedHeight(30);
     connect(m_screenshotBtn, &QPushButton::clicked, this, &MeasurePage::screenshotRequested);
 
-    m_exitBtn = new QPushButton("退出");
+    m_exitBtn = new QPushButton(QString::fromUtf8("退出"));
     m_exitBtn->setObjectName("ExitBtn");
     m_exitBtn->setCursor(Qt::PointingHandCursor);
     m_exitBtn->setFixedHeight(30);
     connect(m_exitBtn, &QPushButton::clicked, this, [this] {
         auto btn = QMessageBox::question(
-            this, "关闭仪器",
-            "是否关闭仪器?",
+            this, QString::fromUtf8("关闭仪器"),
+            QString::fromUtf8("是否关闭仪器?"),
             QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
         if (btn == QMessageBox::Yes)
             emit powerOffAndExitRequested();
@@ -174,13 +174,13 @@ void MeasurePage::setFrozen(bool frozen)
 {
     m_frozen = frozen;
     if (frozen) {
-        m_freezeBtn->setText("解冻");
+        m_freezeBtn->setText(QString::fromUtf8("解冻"));
         m_freezeBtn->setStyleSheet(
             "QPushButton{background:#c2590a;color:white;border:1px solid #e87020;"
             "border-radius:4px;font-weight:600;font-size:13px;}"
             "QPushButton:hover{background:#e87020;}");
     } else {
-        m_freezeBtn->setText("冻结");
+        m_freezeBtn->setText(QString::fromUtf8("冻结"));
         m_freezeBtn->setStyleSheet(
             "QPushButton{background:#18536e;color:white;border:1px solid #3b7893;"
             "border-radius:4px;font-weight:600;font-size:13px;}"

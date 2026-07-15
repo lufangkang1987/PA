@@ -264,112 +264,22 @@ QVector<float> CScanEngine::buildTraceRow(const DataPacket &packet) const
 void CScanEngine::computeScanRules(int beamCount, ScanRule *rules)
 {
     const int count = qBound(1, beamCount, MaxBeams);
-    if (m_explicitRules.size() >= count) {
-        std::copy_n(m_explicitRules.cbegin(), count, rules);
-        return;
-    }
-    const bool hasPositions = m_rulePositions.size() >= count;
-    if (m_params.scanType == 0) {
-        const double angleRange = m_params.angleTo - m_params.angleFrom;
-        for (int b = 0; b < count; ++b) {
-            const double t = count > 1 ? static_cast<double>(b) / (count - 1) : 0.0;
-            rules[b].ang = m_params.angleFrom + angleRange * t;
-            if (!hasPositions) {
-                rules[b].x = qBound(0.0, 255.0 + (t - 0.5) * 400.0, 511.0);
-            } else if (m_params.angleFrom > -0.01f) {
-                rules[b].x = 55.0 + (m_rulePositions[b] - m_rulePositions[0])
-                    / std::max(0.001f, m_params.range) * 400.0;
-            } else if (m_params.angleTo < 0.01f) {
-                rules[b].x = 455.0 + (m_rulePositions[b] - m_rulePositions[0])
-                    / std::max(0.001f, m_params.range) * 400.0;
-            } else {
-                rules[b].x = 255.0
-                    + (m_rulePositions[b] - (m_rulePositions[0] + m_rulePositions[count - 1]) / 2.0)
-                        / std::max(0.001f, m_params.range) * 400.0
-                    + (std::abs(m_params.angleFrom) - std::abs(m_params.angleTo)) * 200.0 / 90.0;
-                rules[b].x = std::min(rules[b].x, 455.0
-                    + (m_rulePositions[b] - m_rulePositions[0])
-                        / std::max(0.001f, m_params.range) * 400.0);
-            }
-        }
-    } else if (m_params.scanType == 1) {
-        const double angle = m_params.angle;
-        const double usable = std::max(1.0, 512.0 - 400.0 * std::sin(angle * M_PI / 180.0));
-        for (int b = 0; b < count; ++b) {
-            const double t = count > 1 ? static_cast<double>(b) / (count - 1) : 0.0;
-            rules[b].x = usable * t;
-            if (hasPositions && angle > 0.01)
-                rules[b].x = (m_rulePositions[b] - m_rulePositions[0])
-                    / std::max(0.001f, m_params.range) * 400.0;
-            rules[b].ang = angle;
-        }
-    } else {
-        for (int b = 0; b < count; ++b) {
-            const double t = count > 1 ? static_cast<double>(b) / (count - 1) : 0.0;
-            rules[b].x = 511.0 * t;
-            rules[b].ang = m_params.angle;
-        }
-    }
-
-    // ── 计算成像跨度 (MFC GetScanRules 中 ImgSpanStart/End) ──
-    if (m_params.scanType == 0) {
-        const double dotMm = m_params.range / 400.0;
-        m_imgSpanStart = static_cast<float>(dotMm * (0.0 - rules[0].x));
-        m_imgSpanEnd   = static_cast<float>(dotMm * (510.0 - rules[0].x));
-    } else if (m_params.scanType == 1) {
-        const float halfMm = m_params.probePitch * (m_params.probeCount - m_params.eleAperture) / 2.0f;
-        m_imgSpanStart = -halfMm;
-        m_imgSpanEnd   =  halfMm;
-    } else {
-        m_imgSpanStart = -180.0f;
-        m_imgSpanEnd   = static_cast<float>(180.0 - 360.0 / std::max(1, m_params.probeCount));
-    }
+    ::computeScanRules(m_params, &m_rulePositions, &m_explicitRules, rules,
+                       &m_imgSpanStart, &m_imgSpanEnd);
+    Q_UNUSED(count);
 }
 
 QVector<uint8_t> CScanEngine::softwareImaging(const DataPacket &packet)
 {
     QVector<uint8_t> image(SImageSize, 0xFF);
     const int count = qBound(0, packet.beamCount, MaxBeams);
-    if (count < 2)
-        return image;
-
+    if (count < 2) return image;
     ScanRule rules[MaxBeams] = {};
     computeScanRules(count, rules);
-    double cosA[MaxBeams], sinA[MaxBeams];
-    for (int b = 0; b < count; ++b) {
-        const double rad = rules[b].ang * M_PI / 180.0;
-        cosA[b] = std::cos(rad);
-        sinA[b] = std::sin(rad);
-    }
-
-    uint8_t *out = image.data();
-    for (int y = 399; y >= 0; --y) {
-        int b = 0;
-        for (int x = 0; x < CScanWidth; ++x, ++out) {
-            double x1 = 0.0;
-            for (; b < count; ++b) {
-                x1 = (x - rules[b].x) * cosA[b] - y * sinA[b];
-                if (x1 < 0.0) break;
-            }
-            if (b == 0 || b == count) continue;
-
-            const double y1 = y * cosA[b] + (x - rules[b].x) * sinA[b];
-            const double y0 = y * cosA[b - 1] + (x - rules[b - 1].x) * sinA[b - 1];
-            const int n0 = static_cast<int>(y0 + 1.0);
-            const int n1 = static_cast<int>(y1 + 1.0);
-            if (n0 < 0 || n1 < 0 || n0 >= WaveSampleCount || n1 >= WaveSampleCount)
-                continue;
-
-            const double x0 = (x - rules[b - 1].x) * cosA[b - 1] - y * sinA[b - 1];
-            const double d = x0 - x1;
-            const int v0 = packet.beams[b - 1].waveP[n0];
-            const int v1 = packet.beams[b].waveP[n1];
-            int value = v1;
-            if (x0 < 0.25 * d) value = v0;
-            else if (x0 < 0.75 * d) value = (v0 + v1) / 2;
-            *out = static_cast<uint8_t>(std::min(value, 250));
-        }
-    }
+    const uint8_t *waveP[MaxBeams];
+    for (int b = 0; b < count; ++b)
+        waveP[b] = packet.beams[b].waveP;
+    ::softwareImaging(waveP, rules, count, image.data());
     return image;
 }
 

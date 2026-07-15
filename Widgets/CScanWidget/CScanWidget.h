@@ -2,6 +2,7 @@
 #include <QWidget>
 #include <QImage>
 #include <QVector>
+#include "datatypes.h"
 
 class CScanWidget : public QWidget
 {
@@ -65,5 +66,5 @@ private:
     int m_pageStart = 0;
     int m_imageColumnStart = 0;
     int m_imageColumnEnd = 512;
-    static constexpr int PageLineCount = 925;
+    static constexpr int PageLineCount = CScanLinesPerPage;
 };

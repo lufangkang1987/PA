@@ -1,35 +1,11 @@
 #include "CScanWidget.h"
 #include <QPainter>
+#include "Theme.h"
+#include "ColorMap.h"
 #include <QFontMetrics>
 #include <QtMath>
 #include <QMouseEvent>
 
-static QColor valueToOriginalColor(int value)
-{
-    float h, s, v;
-    if (value <= 60) {
-        h = 240.0f - 24.0f / 61.0f * value;
-        s = 73.0f / 61.0f * value;
-        v = 100.0f - 51.0f / 61.0f * value;
-    } else if (value <= 102) {
-        h = 216.0f - 75.0f / 42.0f * (value - 61);
-        s = 73.0f + 7.0f / 42.0f * (value - 61);
-        v = 49.0f + 6.0f / 42.0f * (value - 61);
-    } else if (value <= 179) {
-        h = 141.0f - 84.0f / 76.0f * (value - 103);
-        s = 86.0f - 15.0f / 76.0f * (value - 103);
-        v = 55.0f + 36.0f / 76.0f * (value - 103);
-    } else if (value <= 230) {
-        h = 57.0f - 56.0f / 50.0f * (value - 180);
-        s = 71.0f + 5.0f / 50.0f * (value - 180);
-        v = 91.0f - 9.0f / 50.0f * (value - 180);
-    } else {
-        h = 1.0f;
-        s = 86.0f + 13.0f / 25.0f * (value - 231);
-        v = 82.0f + 17.0f / 25.0f * (value - 231);
-    }
-    return QColor::fromHsvF(h / 360.0f, s / 100.0f, v / 100.0f);
-}
 
 CScanWidget::CScanWidget(QWidget *parent) : QWidget(parent)
 {
@@ -116,7 +92,7 @@ void CScanWidget::rebuildFromData()
         for (int x = 0; x < m_dataWidth; ++x) {
             // 振幅 0→暗灰(24,30,36), 1→亮白(245,247,249)
             const float v = qBound(0.0f, m_data[y * m_dataWidth + x], 1.0f);
-            line[x] = valueToOriginalColor(qRound(v * 255.0f)).rgb();
+            line[x] = amplitudeToColor(qRound(v * 255.0f));
         }
     }
 }
@@ -150,7 +126,7 @@ void CScanWidget::rebuildMock(const QSize &size)
 void CScanWidget::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
-    p.fillRect(rect(), QColor(7, 17, 27));
+    p.fillRect(rect(), ThemeColor::DeepBg);
 
     // 自适应边距
     const int ml = qMin(50, qMax(20, width() / 8));
@@ -189,7 +165,7 @@ void CScanWidget::paintEvent(QPaintEvent *)
         p.drawLine(plot.left(), y, plot.right(), y);
 
     // 轴标签
-    QFont axisFont("Microsoft YaHei", 8);
+    QFont axisFont(ThemeFont::Ui, 8);
     p.setFont(axisFont);
     const QFontMetrics afm(axisFont);
     p.setPen(QColor(210, 222, 232));
@@ -239,7 +215,7 @@ void CScanWidget::paintEvent(QPaintEvent *)
     // 回放标记
     if (m_replay) {
         p.setPen(QColor(255, 140, 0, 200));
-        QFont rf("Microsoft YaHei", 11); rf.setBold(true);
+        QFont rf(ThemeFont::Ui, 11); rf.setBold(true);
         p.setFont(rf);
         p.drawText(plot.right() - 70, plot.top() + 16, "REPLAY");
     }

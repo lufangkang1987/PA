@@ -1,10 +1,16 @@
 #include "MainWindow.h"
 #include "HomePage.h"
+#include "Theme.h"
 #include "ParamPage.h"
 #include "MeasurePage.h"
 #include "IDriver.h"
 #include "CTSPA22SDriver.h"
 #include "AppState.h"
+#include "CalibrationController.h"
+#include "ConnectionManager.h"
+#include "ParameterDispatcher.h"
+#include "CScanIOManager.h"
+#include "ReadingCalculator.h"
 #include "CScanEngine.h"
 #include "CScanDataCodec.h"
 #include <QWidget>
@@ -23,7 +29,6 @@
 #include <QCoreApplication>
 #include <QApplication>
 #include <QDir>
-#include <QMessageBox>
 #include <QDateTime>
 #include <QThread>
 #ifdef Q_OS_WIN
@@ -47,6 +52,23 @@ void MainWindow::setupUi()
     root->setContentsMargins(6, 6, 6, 6);
     root->setSpacing(6);
 
+    m_driver = new CTSPA22SDriver(this);  // 提前创建，供 buildHeader 中 ConnectionManager 使用
+    buildHeader(shell, root);
+    buildCentral(root);
+    setCentralWidget(shell);
+    buildDriverAndEngine();
+    wirePageSignals();
+    wireCScanIO();
+    wireCalibration();
+    wireDriverSignals();
+    applyGlobalStyleSheet();
+
+    statusBar()->showMessage(QString::fromUtf8("系统就绪"));
+    setUpdatesEnabled(true);
+}
+
+void MainWindow::buildHeader(QWidget *shell, QVBoxLayout *root)
+{
     auto *header = new QFrame(shell);
     header->setObjectName("TopHeader");
     header->setMinimumHeight(48);
@@ -86,7 +108,7 @@ void MainWindow::setupUi()
     m_deviceLabel->setObjectName("DeviceOk");
     m_deviceLabel->setMinimumWidth(0);
     m_deviceLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    m_ipLabel = new QLabel("IP: 192.168.0.51", header);
+    m_ipLabel = new QLabel(QString("IP: %1").arg(CTSPA22SDriver::DefaultWifiIP), header);
     m_ipLabel->setObjectName("HeaderInfo");
     m_ipLabel->setMinimumWidth(0);
     m_ipLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
@@ -131,15 +153,22 @@ void MainWindow::setupUi()
         return b;
     };
 
-    m_connectBtn = makeBtn(QString::fromUtf8("连接设备"), "#0a6e3b", header);
-    m_acquireBtn = makeBtn(QString::fromUtf8("开始采集"), "#0652a2", header);
+    auto *connectBtn = makeBtn(QString::fromUtf8("连接设备"), "#0a6e3b", header);
+    auto *acquireBtn = makeBtn(QString::fromUtf8("开始采集"), "#0652a2", header);
 
     headerLayout->addSpacing(8);
-    headerLayout->addWidget(m_connectBtn);
-    headerLayout->addWidget(m_acquireBtn);
+    headerLayout->addWidget(connectBtn);
+    headerLayout->addWidget(acquireBtn);
 
     root->addWidget(header);
 
+    m_connManager = new ConnectionManager(m_driver, m_modeCombo, m_deviceLabel,
+        m_ipLabel, connectBtn, acquireBtn, this);
+    m_connManager->initialize();
+}
+
+void MainWindow::buildCentral(QVBoxLayout *root)
+{
     m_homePage = new HomePage;
     m_paramPage = new ParamPage;
     m_measurePage = new MeasurePage;
@@ -154,9 +183,10 @@ void MainWindow::setupUi()
     mainLayout->addWidget(m_measurePage);
 
     root->addLayout(mainLayout, 1);
-    setCentralWidget(shell);
+}
 
-    m_driver = new CTSPA22SDriver(this);
+void MainWindow::buildDriverAndEngine()
+{
     m_cScanThread = new QThread(this);
     m_cScanThread->setObjectName("CScanImagingThread");
     m_cScanEngine = new CScanEngine;
@@ -164,9 +194,25 @@ void MainWindow::setupUi()
     connect(m_cScanThread, &QThread::finished, m_cScanEngine, &QObject::deleteLater);
     m_cScanThread->start();
     m_homePage->setDriver(m_driver);
-    m_paramPage->setDriver(m_driver);
+    auto *paramDispatcher = new ParameterDispatcher(this);
+    paramDispatcher->setDriver(m_driver);
+    m_paramPage->setDispatcher(paramDispatcher);
+    m_calController = new CalibrationController(m_driver, m_paramPage,
+        m_cScanEngine, m_homePage, this);
+    connect(m_calController, &CalibrationController::statusMessage, this,
+            [this](const QString &msg) { statusBar()->showMessage(msg); });
+    m_ioManager = new CScanIOManager(m_homePage, m_paramPage,
+        m_cScanEngine, m_calController, this);
+    connect(m_ioManager, &CScanIOManager::statusMessage, this,
+            [this](const QString &msg) { statusBar()->showMessage(msg); });
     const bool paramsLoaded = m_paramPage->initializeParams();
     m_homePage->configureCScanView(m_paramPage->params());
+    if (!paramsLoaded)
+        statusBar()->showMessage(QString::fromUtf8("默认参数文件加载失败，已使用程序内置参数"));
+}
+
+void MainWindow::wirePageSignals()
+{
     // ── MeasurePage 信号 → MainWindow ──
     connect(m_measurePage, &MeasurePage::exitRequested, this, &MainWindow::close);
     connect(m_measurePage, &MeasurePage::powerOffAndExitRequested, this, [this] {
@@ -201,8 +247,6 @@ void MainWindow::setupUi()
     connect(m_measurePage, &MeasurePage::applyLawRequested,
             m_paramPage, &ParamPage::onApplyLaw);
 
-    wireDriverSignals();
-
     // A扫闸门拖拽 → 更新 ParamPage 控件 + 下发硬件
     connect(m_homePage, &HomePage::gateDragged,
             m_paramPage, &ParamPage::onGateDragged);
@@ -215,9 +259,7 @@ void MainWindow::setupUi()
     // 参数页闸门变化 → 主页A扫闸门显示
     connect(m_paramPage, &ParamPage::gateParamsChanged, this, [this] {
         static const QColor gateColors[3] = {
-            QColor(255, 30, 30),    // A 红
-            QColor(255, 200, 0),    // B 黄
-            QColor(200, 50, 255),   // C 紫
+            ThemeColor::GateA, ThemeColor::GateB, ThemeColor::GateC
         };
         for (int g = 0; g < 3; ++g) {
             bool enabled; float start, width, threshold;
@@ -230,7 +272,7 @@ void MainWindow::setupUi()
 
     // C扫扫描按钮信号（来自 ParamPage 成像子页）
     connect(m_paramPage, &ParamPage::scanStarted, this, [this] {
-        if (m_calibrating || m_encoderCalibrating || AppState::instance()->replayState()) {
+        if (m_calController->isCalibrating() || m_calController->isEncoderCalibrating() || AppState::instance()->replayState()) {
             statusBar()->showMessage(QString::fromUtf8("请先退出校准或回放状态"));
             m_paramPage->finishScan();
             return;
@@ -252,248 +294,35 @@ void MainWindow::setupUi()
     // 声束号 / 增益变化 → 右侧测量面板读数
     connect(m_paramPage, &ParamPage::beamInfoChanged,
             m_measurePage, &MeasurePage::updateBeamInfo);
+}
 
-    // C扫保存数据（ParamPage 已选好路径，MainWindow 执行实际写入）
-    connect(m_paramPage, &ParamPage::saveDataRequested, this, [this](const QString &path) {
-        if (!m_homePage || !m_paramPage) return;
-        int w = 0, h = 0;
-        QVector<float> data = m_homePage->getCScanData(w, h);
-        if (data.isEmpty() || w <= 0 || h <= 0) {
-            statusBar()->showMessage(QString::fromUtf8("无C扫数据可保存"));
-            return;
-        }
-        QJsonObject paramsJson = m_paramPage->serializeParams();
-        if (saveCScanFile(path, data, w, h, paramsJson,
-                          m_cScanEngine->archivedPackets())) {
-            statusBar()->showMessage(QString::fromUtf8("C扫数据已保存: %1 (%2×%3)")
-                .arg(path).arg(w).arg(h));
-        } else {
-            statusBar()->showMessage(QString::fromUtf8("保存C扫数据失败"));
-        }
-    });
-
-    // C扫回放数据
-    connect(m_paramPage, &ParamPage::replayDataRequested, this, [this](const QString &path) {
-        if (!m_homePage || !m_paramPage) return;
-        if (m_calibrating || m_encoderCalibrating || m_cScanEngine->isScanning()) {
-            statusBar()->showMessage(QString::fromUtf8("扫查或校准期间不能进入回放"));
-            return;
-        }
-        int w = 0, h = 0;
-        QJsonObject paramsJson;
-        QVector<DataPacket> packets;
-        QVector<ScanRule> loadedRules;
-        QVector<float> data = loadCScanFile(path, w, h, paramsJson, packets, &loadedRules);
-        if (data.isEmpty() || w <= 0 || h <= 0) {
-            statusBar()->showMessage(QString::fromUtf8("加载C扫数据失败"));
-            return;
-        }
-        m_homePage->setCScanReplayData(data, w, h, true);
-        m_cScanEngine->setArchivedPackets(packets);
-        if (!loadedRules.isEmpty()) m_cScanEngine->setScanRules(loadedRules);
-        AppState::instance()->setReplayState(true);
-        AppState::instance()->setReplayCurPos(0);
-        // 恢复参数（静默加载，不触发硬件下发）
-        m_paramPage->deserializeParams(paramsJson);
-        m_paramPage->syncUiFromParams();
-        m_homePage->configureCScanView(m_paramPage->params());
-        statusBar()->showMessage(QString::fromUtf8("C扫回放: %1 (%2×%3)")
-            .arg(path).arg(w).arg(h));
-    });
-    connect(m_homePage, &HomePage::cScanPositionSelected, this,
-            [this](int line, int) {
-        const auto &packets = m_cScanEngine->archivedPackets();
-        if (line < 0 || line >= packets.size()) return;
-        AppState::instance()->setReplayCurPos(line);
-        m_homePage->showReplayPacket(packets[line], line,
-            m_paramPage->params().curBeam, m_paramPage->params().rectify);
-    });
+void MainWindow::wireCScanIO()
+{
+    connect(m_paramPage, &ParamPage::saveDataRequested,
+            m_ioManager, &CScanIOManager::onSaveDataRequested);
+    connect(m_paramPage, &ParamPage::replayDataRequested,
+            m_ioManager, &CScanIOManager::onReplayDataRequested);
+    connect(m_homePage, &HomePage::cScanPositionSelected,
+            m_ioManager, &CScanIOManager::onCScanPositionSelected);
     connect(m_homePage, &HomePage::cScanAnalysisRectChanged,
             m_paramPage, &ParamPage::setAnalysisRect);
-    connect(m_paramPage, &ParamPage::cScanViewParamsChanged, this, [this] {
-        m_homePage->configureCScanView(m_paramPage->params());
-    });
-    connect(m_paramPage, &ParamPage::calibrationRequested, this, [this](int item) {
-        auto *ct = static_cast<CTSPA22SDriver*>(static_cast<IDriver*>(m_driver));
-        if (!ct || !m_driver->isConnected()) {
-            statusBar()->showMessage(QString::fromUtf8("校准需要先连接设备"));
-            return;
-        }
-        if (m_cScanEngine->isScanning() || AppState::instance()->replayState()) {
-            statusBar()->showMessage(QString::fromUtf8("请先退出扫查或回放状态"));
-            return;
-        }
-        if (!m_calibrating) {
-            m_calibrating = true;
-            m_calibrationItem = item;
-            const PAParams &p = m_paramPage->params();
-            if (item == 2 || item == 3) {
-                const bool useFifty = QMessageBox::question(
-                    this, QString::fromUtf8("校准参考线"), QString::fromUtf8("默认参考线为80%，是否改为50%？"),
-                    QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes;
-                m_calibrationTargetPercent = useFifty ? 50 : 80;
-                m_homePage->setAScanCalibrationGuide(true, m_calibrationTargetPercent);
-            } else {
-                m_homePage->setAScanCalibrationGuide(false);
-            }
-            const int centerBeam = p.scanType == 0 ? 63
-                : (p.scanType == 1 ? (p.probeCount - p.eleAperture + 1) / 2
-                                   : p.probeCount / 2);
-            if (item < 3) m_paramPage->setBeamNo(qBound(0, centerBeam, MaxBeams - 1));
-            if (item == 2) ct->setACG(false, p);
-            if (item == 3) ct->setTCG(false, p);
-            statusBar()->showMessage(QString::fromUtf8("校准已开始，取得稳定回波后再次点击完成"));
-            return;
-        }
-        if (!m_hasLatestPacket || m_latestPacket.beamCount <= 0) {
-            statusBar()->showMessage(QString::fromUtf8("尚未收到有效采集数据"));
-            return;
-        }
+    connect(m_paramPage, &ParamPage::cScanViewParamsChanged,
+            m_ioManager, &CScanIOManager::onCScanViewParamsChanged);
+    connect(m_paramPage, &ParamPage::cScanPageRequested,
+            m_ioManager, &CScanIOManager::onCScanPageRequested);
+    connect(m_paramPage, &ParamPage::exitReplayRequested,
+            m_ioManager, &CScanIOManager::onExitReplayRequested);
+}
+void MainWindow::wireCalibration()
+{
+    connect(m_paramPage, &ParamPage::calibrationRequested,
+            m_calController, &CalibrationController::onCalibrationRequested);
+    connect(m_paramPage, &ParamPage::encoderCalibrationRequested,
+            m_calController, &CalibrationController::onEncoderCalibrationRequested);
+}
 
-        const PAParams &p = m_paramPage->params();
-        const int beam = qBound(0, p.curBeam, m_latestPacket.beamCount - 1);
-        const BeamWaveform &wave = m_latestPacket.beams[beam];
-        auto pathMm = [&p](quint16 path) {
-            return p.gateTrace[2] ? path * p.range / WaveSampleCount
-                                  : path * S22_SP * p.lVelocity / 2000000.0;
-        };
-        if (m_calibrationItem == 0) {
-            const double difference = pathMm(wave.path1) - pathMm(wave.path0);
-            if (difference > 1.0)
-                m_paramPage->setCalibratedVelocity(qRound(p.realDistance * p.lVelocity / difference));
-            ct->setVelocity(m_paramPage->params().lVelocity);
-            ct->setRange(m_paramPage->params().range);
-        } else if (m_calibrationItem == 1) {
-            const float delay = float((pathMm(wave.path0) - p.realDistance)
-                                * 2000.0 / p.lVelocity + p.probeDelay);
-            m_paramPage->setCalibratedProbeDelay(delay);
-            if (p.scanType < 3) ct->setBeamDelay(); else ct->setCommonRDelay();
-        } else if (m_calibrationItem == 2) {
-            QVector<float> values(m_latestPacket.beamCount, 1.0f);
-            for (int i = 0; i < m_latestPacket.beamCount; ++i) {
-                const int amplitude = m_latestPacket.beams[i].amp0;
-                values[i] = amplitude > 0
-                    ? qBound(0.0f, m_calibrationTargetPercent * 2.5f / amplitude, 256.0f)
-                    : 256.0f;
-            }
-            m_paramPage->setCalibratedACG(values);
-            ct->setACG(true, m_paramPage->params());
-        } else if (m_calibrationItem == 3) {
-            ct->setTCG(true, p);
-        }
-        m_calibrating = false;
-        m_calibrationItem = -1;
-        m_homePage->setAScanCalibrationGuide(false);
-        statusBar()->showMessage(QString::fromUtf8("校准完成并已应用"));
-    });
-    connect(m_paramPage, &ParamPage::encoderCalibrationRequested, this, [this] {
-        if (!m_driver || !m_driver->isConnected()) {
-            statusBar()->showMessage(QString::fromUtf8("编码器校准需要先连接设备"));
-            return;
-        }
-        if (m_cScanEngine->isScanning() || AppState::instance()->replayState() || m_calibrating) {
-            statusBar()->showMessage(QString::fromUtf8("请先退出扫查、回放或其他校准状态"));
-            return;
-        }
-        const int position = int(AppState::instance()->encoderCount());
-        if (!m_encoderCalibrating) {
-            m_driver->resetEncoder(0);
-            m_encoderCalibrationStart = 0;
-            m_encoderCalibrating = true;
-            statusBar()->showMessage(QString::fromUtf8("编码器校准已开始，请移动指定距离后再次点击"));
-        } else {
-            const int pulses = qAbs(position - m_encoderCalibrationStart);
-            if (pulses > 0)
-                m_paramPage->setCalibratedCoderDeg(m_paramPage->params().checkDistance / pulses);
-            m_encoderCalibrating = false;
-            statusBar()->showMessage(QString::fromUtf8("编码器精度：%1 mm/p")
-                .arg(m_paramPage->params().coderDeg, 0, 'f', 4));
-        }
-    });
-    connect(m_paramPage, &ParamPage::cScanPageRequested, this, [this] {
-        const int count = m_cScanEngine->archivedPackets().size();
-        if (count <= 0) return;
-        const int maximumStart = qMax(0, count - 925);
-        int pageStart = m_homePage->cScanPageStart() + 925;
-        if (pageStart > maximumStart) pageStart = 0;
-        m_homePage->setCScanPageStart(pageStart);
-        const int line = qBound(0, pageStart + m_paramPage->params().anaLineX1, count - 1);
-        AppState::instance()->setReplayCurPos(line);
-        m_homePage->showReplayPacket(m_cScanEngine->archivedPackets()[line], line,
-            m_paramPage->params().curBeam, m_paramPage->params().rectify);
-    });
-    connect(m_paramPage, &ParamPage::exitReplayRequested, this, [this] {
-        AppState::instance()->setReplayState(false);
-        AppState::instance()->setReplayCurPos(0);
-        m_homePage->setCScanReplayMode(false);
-        m_homePage->setCScanPageStart(0);
-        m_homePage->selectCScanLine(-1);
-        statusBar()->showMessage(QString::fromUtf8("已退出 C 扫回放"));
-    });
-
-    // ────── 连接按钮 ──────
-    connect(m_connectBtn, &QPushButton::clicked, this, [this] {
-        if (!m_driver) return;
-
-        if (m_driver->isConnected()) {
-            // 断开
-            m_driver->stopAcquisition();
-            m_driver->disconnectDevice();
-        } else {
-            // 连接
-            auto mode = static_cast<ConnectionMode>(
-                m_modeCombo->currentData().toInt());
-            m_driver->connectDevice(mode);
-        }
-    });
-
-    // ────── 采集按钮 ──────
-    connect(m_acquireBtn, &QPushButton::clicked, this, [this] {
-        if (!m_driver || !m_driver->isConnected()) return;
-
-        bool acquiring = m_acquireBtn->property("acquiring").toBool();
-        if (acquiring) {
-            m_driver->stopAcquisition();
-            m_acquireBtn->setText(QString::fromUtf8("开始采集"));
-            m_acquireBtn->setStyleSheet(m_acquireBtn->styleSheet().replace("#0652a2", "#0652a2"));
-        } else {
-            m_driver->startAcquisition();
-            m_acquireBtn->setText(QString::fromUtf8("停止采集"));
-            m_acquireBtn->setStyleSheet(
-                m_acquireBtn->styleSheet().replace("#0652a2", "#c2590a"));
-        }
-        m_acquireBtn->setProperty("acquiring", !acquiring);
-    });
-
-    // 初始状态
-    m_acquireBtn->setEnabled(false);
-    m_acquireBtn->setProperty("acquiring", false);
-
-    // 切换连接模式 → 自动断开+重连
-    connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this](int /*idx*/) {
-        auto mode = static_cast<ConnectionMode>(
-            m_modeCombo->currentData().toInt());
-        AppState::instance()->setConnectionMode(static_cast<int>(mode));
-
-        // 更新 IP 显示
-        const char *ip = (mode == ConnectionMode::Wireless)
-                         ? CTSPA22SDriver::DefaultWifiIP
-                         : CTSPA22SDriver::DefaultWiredIP;
-        m_ipLabel->setText(QString("IP: %1").arg(ip));
-
-        // 如果当前连接中，断开后用新模式重连
-        if (m_driver && m_driver->isConnected()) {
-            m_driver->stopAcquisition();
-            m_driver->disconnectDevice();
-            m_driver->connectDevice(mode);
-        }
-    });
-
-    statusBar()->showMessage(QString::fromUtf8("系统就绪"));
-    if (!paramsLoaded)
-        statusBar()->showMessage(QString::fromUtf8("默认参数文件加载失败，已使用程序内置参数"));
-
+void MainWindow::applyGlobalStyleSheet()
+{
     setStyleSheet(R"(
         QMainWindow { background:#06101a; }
         #TopHeader {
@@ -511,8 +340,6 @@ void MainWindow::setupUi()
             border:0;
         }
     )");
-
-    setUpdatesEnabled(true);
 }
 
 void MainWindow::wireDriverSignals()
@@ -524,32 +351,14 @@ void MainWindow::wireDriverSignals()
     {
         connect(m_driver, &IDriver::connectionChanged, this, [this](bool ok) {
             AppState::instance()->setConnected(ok);
-            m_deviceLabel->setText(ok ? QString::fromUtf8("\u25CF 设备连接： 已连接")
-                                      : QString::fromUtf8("\u25CF 设备连接： 未连接"));
-
-            if (ok) {
-                m_connectBtn->setText(QString::fromUtf8("断开设备"));
-                m_connectBtn->setStyleSheet(m_connectBtn->styleSheet().replace("#0a6e3b", "#8b2020"));
-                m_acquireBtn->setEnabled(true);
-                m_acquireBtn->setText(QString::fromUtf8("开始采集"));
-                m_acquireBtn->setStyleSheet(m_acquireBtn->styleSheet().replace("#c2590a", "#0652a2"));
-                m_acquireBtn->setProperty("acquiring", false);
-                m_paramPage->applyCurrentParams();
-            } else {
-                m_connectBtn->setText(QString::fromUtf8("连接设备"));
-                m_connectBtn->setStyleSheet(m_connectBtn->styleSheet().replace("#8b2020", "#0a6e3b"));
-                m_acquireBtn->setEnabled(false);
-                m_acquireBtn->setText(QString::fromUtf8("开始采集"));
-                m_acquireBtn->setStyleSheet(m_acquireBtn->styleSheet().replace("#c2590a", "#0652a2"));
-                m_acquireBtn->setProperty("acquiring", false);
-            }
+            if (ok) m_paramPage->applyCurrentParams();
         });
         connect(m_driver, &IDriver::statusChanged, this, [this](const QString &s) {
             statusBar()->showMessage(s);
         });
         connect(m_driver, &IDriver::errorOccurred, this, [this](const QString &e) {
             AppState::instance()->setConnected(false);
-            statusBar()->showMessage(QString::fromUtf8("\u9519\u8BEF\uFF1A") + e);
+            statusBar()->showMessage(QString::fromUtf8("错误：") + e);
         });
         connect(m_driver, &IDriver::temperatureReceived, this, [this](double t) {
             AppState::instance()->setTemperature(static_cast<float>(t));
@@ -575,57 +384,20 @@ void MainWindow::wireDriverSignals()
         });
         connect(m_driver, &IDriver::dataPacketReady, this, [this](const DataPacket &packet) {
             m_latestPacket = packet;
+            m_calController->setLatestPacket(packet);
             m_hasLatestPacket = packet.beamCount > 0;
             if (!m_hasLatestPacket || !m_measurePage || !m_paramPage) return;
 
-            const PAParams &params = m_paramPage->params();
-            const int beam = qBound(0, params.curBeam, packet.beamCount - 1);
-            const BeamWaveform &wave = packet.beams[beam];
-            double angle = params.angle;
-            if (params.scanType == 0) {
-                const double t = packet.beamCount > 1
-                    ? static_cast<double>(beam) / (packet.beamCount - 1) : 0.0;
-                angle = params.angleFrom + (params.angleTo - params.angleFrom) * t;
-            }
+            const GateReadings r = calculateReadings(m_paramPage->params(), packet, m_scanRulePositions);
+            m_measurePage->updateGateReadings('A', r.aAmplitude, r.aSoundPathMm, r.angleDegrees, r.horizontalOffsetMm);
+            m_measurePage->updateGateReadings('B', r.bAmplitude, r.bSoundPathMm, r.angleDegrees, r.horizontalOffsetMm);
 
-            double horizontalOffset = 0.0;
-            if (params.scanType == 0 && params.wedgeEnable != 0
-                    && m_scanRulePositions.size() >= packet.beamCount) {
-                const int centerBeam = qBound(0, 63, packet.beamCount - 1);
-                horizontalOffset = m_scanRulePositions[beam]
-                    - m_scanRulePositions[centerBeam];
-            }
-            auto soundPathMm = [&params](quint16 path) {
-                return params.gateTrace[2]
-                    ? path * params.range / WaveSampleCount
-                    : path * S22_SP * params.lVelocity / 2000000.0;
-            };
-            m_measurePage->updateGateReadings(
-                'A', qMin(100.0, wave.amp0 / 2.5), soundPathMm(wave.path0),
-                angle, horizontalOffset);
-            m_measurePage->updateGateReadings(
-                'B', qMin(100.0, wave.amp1 / 2.5), soundPathMm(wave.path1),
-                angle, horizontalOffset);
-
-            // ── 蜂鸣报警 ──
-            if (params.alarmSound != 0) {
-                bool triggered = false;
-                const int sound = params.alarmSound;  // 1=A, 2=B, 3=AB
-                const int threshA = qRound(params.gateThreshold[0] * 2.5);
-                const int threshB = qRound(params.gateThreshold[1] * 2.5);
-                for (int b = 0; b < packet.beamCount && !triggered; ++b) {
-                    if ((sound == 1 || sound == 3) && packet.beams[b].amp0 > threshA)
-                        triggered = true;
-                    if ((sound == 2 || sound == 3) && packet.beams[b].amp1 > threshB)
-                        triggered = true;
-                }
-                if (triggered) {
+            if (r.alarmTriggered) {
 #ifdef Q_OS_WIN
-                    Beep(2000, 500);
+                Beep(2000, 500);
 #else
-                    QApplication::beep();
+                QApplication::beep();
 #endif
-                }
             }
         });
         connect(m_cScanEngine, &CScanEngine::imageUpdated, this,

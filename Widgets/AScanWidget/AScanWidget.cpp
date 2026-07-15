@@ -1,5 +1,6 @@
 #include "AScanWidget.h"
 #include <QPainter>
+#include "Theme.h"
 #include <QPainterPath>
 #include <QMouseEvent>
 #include <QtMath>
@@ -108,7 +109,7 @@ void AScanWidget::paintEvent(QPaintEvent *)
 
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    p.fillRect(rect(), QColor(7, 17, 27));
+    p.fillRect(rect(), ThemeColor::DeepBg);
 
     // 黑色背景
     p.fillRect(plot, QColor(0, 0, 0));
@@ -135,7 +136,7 @@ void AScanWidget::paintEvent(QPaintEvent *)
     // ── X 轴标尺：幅度 % ──
     {
         p.setPen(QColor(160, 185, 200));
-        QFont f("Microsoft YaHei", 9);
+        QFont f(ThemeFont::Ui, 9);
         p.setFont(f);
         const QFontMetrics fm(f);
         const int textH = fm.ascent();
@@ -160,7 +161,7 @@ void AScanWidget::paintEvent(QPaintEvent *)
     // ── Y 轴标尺：深度 mm ──
     {
         p.setPen(QColor(160, 185, 200));
-        QFont f("Microsoft YaHei", 9);
+        QFont f(ThemeFont::Ui, 9);
         p.setFont(f);
         const QFontMetrics fm(f);
         const int ml = int(plot.left());
@@ -226,7 +227,7 @@ void AScanWidget::paintEvent(QPaintEvent *)
             p.drawLine(QPointF(thX - 5, y2), QPointF(thX + 5, y2));
             // 标签
             static const char *lbl[] = {"A", "B", "C"};
-            QFont gf("Microsoft YaHei", 11); gf.setBold(true);
+            QFont gf(ThemeFont::Ui, 11); gf.setBold(true);
             p.setFont(gf);
             p.setPen(gate.color);
             p.drawText(QPointF(thX + 4, y1 + 14), QString::fromLatin1(lbl[g]));
@@ -235,7 +236,7 @@ void AScanWidget::paintEvent(QPaintEvent *)
 
     // ── HUD ──
     {
-        QFont hud("Consolas", 8);
+        QFont hud(ThemeFont::Mono, 8);
         p.setFont(hud);
         const QFontMetrics hm(hud);
         static const char *modes[] = {"QW", "ZW", "FW", "RF"};
@@ -256,7 +257,7 @@ void AScanWidget::paintEvent(QPaintEvent *)
         p.setPen(m_alarm ? QColor(255, 80, 80, 200)
                  : m_frozen ? QColor(255, 200, 80, 200)
                  : m_isLive ? QColor(0, 200, 40, 200) : QColor(120, 140, 120, 110));
-        p.setFont(QFont("Microsoft YaHei", 8));
+        p.setFont(QFont(ThemeFont::Ui, 8));
         p.drawText(plot.left() + 16, plot.top() + 12,
                    m_alarm ? "ALARM" :
                    m_frozen ? "FROZEN" : m_isLive ? "LIVE" : "SIM");

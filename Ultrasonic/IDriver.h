@@ -1,5 +1,6 @@
 #pragma once
 #include "DataTypes.h"
+#include "PAParams.h"
 #include <QObject>
 
 class IDriver : public QObject
@@ -51,6 +52,10 @@ public:
     virtual void setLscanAngle(float angleDeg) = 0;
     virtual void setFocusMm(float mm) = 0;
     virtual void setWedgeGeometry(bool enable, float angleDeg, int velocityMps, float heightMm) = 0;
+
+    // -------- 校准 --------
+    virtual void setACG(bool enabled, const PAParams &params) = 0;
+    virtual void setTCG(bool enabled, const PAParams &params) = 0;
 
     // -------- 遥测 --------
     virtual void queryTemperature() = 0;

@@ -1,5 +1,7 @@
 #pragma once
 #include "DataTypes.h"
+#include <QVector>
+#include <QtGlobal>
 
 // ── 参数值结构（镜像 CTSPA22S PARTNODE + PARANODE 全部字段）──
 // BeamDesc 已在 DataTypes.h 中定义
@@ -151,3 +153,79 @@ struct PAParams
     int   tempBeamCount  = 128;   // 存储的检测声束数
     BeamDesc beams[128]  = {};    // 声束描述符
 };
+
+// ============================================================
+//  共享扫查法则计算（BScanWidget + CScanEngine 共用）
+// ============================================================
+inline int computeScanRules(const PAParams &params,
+                            const QVector<double> *rulePositions,
+                            const QVector<ScanRule> *explicitRules,
+                            ScanRule *rulesOut,
+                            float *imgSpanStart = nullptr,
+                            float *imgSpanEnd = nullptr)
+{
+    const int count = qBound(1, params.beamCount, MaxBeams);
+    if (explicitRules && explicitRules->size() >= count) {
+        std::copy_n(explicitRules->cbegin(), count, rulesOut);
+        return count;
+    }
+    const bool hasPositions = rulePositions && rulePositions->size() >= count;
+
+    if (params.scanType == 0) {
+        const double angleRange = params.angleTo - params.angleFrom;
+        for (int b = 0; b < count; ++b) {
+            const double t = count > 1 ? double(b) / (count - 1) : 0.0;
+            rulesOut[b].ang = params.angleFrom + angleRange * t;
+            if (!hasPositions) {
+                rulesOut[b].x = qBound(0.0, 255.0 + (t - 0.5) * 400.0, 511.0);
+            } else if (params.angleFrom > -0.01f) {
+                rulesOut[b].x = 55.0 + ((*rulePositions)[b] - (*rulePositions)[0])
+                    / std::max(0.001, double(params.range)) * 400.0;
+            } else if (params.angleTo < 0.01f) {
+                rulesOut[b].x = 455.0 + ((*rulePositions)[b] - (*rulePositions)[0])
+                    / std::max(0.001, double(params.range)) * 400.0;
+            } else {
+                rulesOut[b].x = 255.0
+                    + ((*rulePositions)[b] - ((*rulePositions)[0] + (*rulePositions)[count - 1]) / 2.0)
+                        / std::max(0.001, double(params.range)) * 400.0
+                    + (std::abs(params.angleFrom) - std::abs(params.angleTo)) * 200.0 / 90.0;
+                rulesOut[b].x = std::min(rulesOut[b].x, 455.0
+                    + ((*rulePositions)[b] - (*rulePositions)[0])
+                        / std::max(0.001, double(params.range)) * 400.0);
+            }
+        }
+    } else if (params.scanType == 1) {
+        const double angle = params.angle;
+        const double usable = std::max(1.0, 512.0 - 400.0 * std::sin(angle * 3.14159265358979323846 / 180.0));
+        for (int b = 0; b < count; ++b) {
+            const double t = count > 1 ? double(b) / (count - 1) : 0.0;
+            rulesOut[b].x = usable * t;
+            if (hasPositions && angle > 0.01)
+                rulesOut[b].x = ((*rulePositions)[b] - (*rulePositions)[0])
+                    / std::max(0.001, double(params.range)) * 400.0;
+            rulesOut[b].ang = angle;
+        }
+    } else {
+        for (int b = 0; b < count; ++b) {
+            const double t = count > 1 ? double(b) / (count - 1) : 0.0;
+            rulesOut[b].x = 511.0 * t;
+            rulesOut[b].ang = params.angle;
+        }
+    }
+
+    if (imgSpanStart && imgSpanEnd) {
+        if (params.scanType == 0) {
+            const double dotMm = params.range / 400.0;
+            *imgSpanStart = float(dotMm * (0.0 - rulesOut[0].x));
+            *imgSpanEnd   = float(dotMm * (510.0 - rulesOut[0].x));
+        } else if (params.scanType == 1) {
+            const float halfMm = params.probePitch * (params.probeCount - params.eleAperture) / 2.0f;
+            *imgSpanStart = -halfMm;
+            *imgSpanEnd   =  halfMm;
+        } else {
+            *imgSpanStart = -180.0f;
+            *imgSpanEnd   = float(180.0 - 360.0 / std::max(1, params.probeCount));
+        }
+    }
+    return count;
+}

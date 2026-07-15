@@ -4,7 +4,6 @@
 #include "CScanWidget.h"
 #include "IDriver.h"
 #include "CTSPA22SDriver.h"
-#include "AppState.h"
 #include "PAParams.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -239,8 +238,6 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 	root->addLayout(grid, 1);
 	root->addWidget(statusBar);
 
-	m_status = new QLabel(QString::fromUtf8("系统状态：待机"));
-	m_status->hide();
 
 	setStyleSheet(R"(
 	        QWidget { background:#07121d; color:#cfe7f4; font-family:"Microsoft YaHei"; }
@@ -278,9 +275,6 @@ void HomePage::setDriver(IDriver* driver)
 
 	{
 		connect(driver, &IDriver::waveformReady, m_aScan, &AScanWidget::setWaveform);
-		connect(driver, &IDriver::statusChanged, this, [this](const QString& s) {
-			m_status->setText(QString::fromUtf8("系统状态：") + s);
-		});
 		connect(driver, &IDriver::frameStatisticsChanged,
 		        this, &HomePage::updateFrameStatistics);
 		connect(driver, &IDriver::multiBeamWaveformsReady, this, [this](const QVector<QVector<double>> &waves) {
@@ -289,28 +283,6 @@ void HomePage::setDriver(IDriver* driver)
 			for (const auto &w : waves)
 				for (const auto &v : w) { if (v > 0.8) { alarm = true; break; } }
 			if (m_aScan) m_aScan->setAlarm(alarm);
-		});
-		connect(driver, &IDriver::tfmImageReady, this, [this](const QVector<int>&) {});
-		connect(driver, &IDriver::gateReadingsReady, this, [](char gate, double amp, double path) {
-			Q_UNUSED(gate); Q_UNUSED(amp); Q_UNUSED(path);
-			// 闸门读数 → MeasurePage（由 MainWindow 连接）
-		});
-
-		auto *st = AppState::instance();
-		m_bScan->setScanParams(st->scanType(), -30.0f, 30.0f, st->beamCount(), 100.0f);
-		m_bScan->setAcousticParams(st->velocity(), st->range(), st->sampleRate());
-
-		connect(st, &AppState::scanTypeChanged, m_bScan, [this](int type) {
-			auto *s = AppState::instance();
-			m_bScan->setScanParams(type, -30.0f, 30.0f, s->beamCount(), 100.0f);
-		});
-		connect(st, &AppState::velocityChanged, m_bScan, [this](float v) {
-			auto *s = AppState::instance();
-			m_bScan->setAcousticParams(v, s->range(), s->sampleRate());
-		});
-		connect(st, &AppState::rangeChanged, m_bScan, [this](float r) {
-			auto *s = AppState::instance();
-			m_bScan->setAcousticParams(s->velocity(), r, s->sampleRate());
 		});
 
 		return;
@@ -375,7 +347,7 @@ void HomePage::setCScanData(const QVector<float> &data, int w, int h)
     if (m_cScan) {
         m_cScan->setReplayMode(false);
         m_cScan->setData(data, w, h);
-        m_cScan->setPageStart(qMax(0, h - 925));
+        m_cScan->setPageStart(qMax(0, h - CScanLinesPerPage));
     }
 }
 

@@ -53,14 +53,7 @@ protected:
 private:
     // ========= 颜色映射 =========
 
-    /// 构建 256 级颜色查找表（MFC Value2Color4 算法）
     void buildColorLUT();
-
-    /// HSV → RGB（MFC hsv2rgb 算法）
-    static QRgb hsv2rgb(double h, double s, double v);
-
-    /// 幅度值 → RGB 颜色（5 段 HSV 映射）
-    static QRgb valueToColor(unsigned int value);
 
     // ========= 扫查法则计算 =========
 
@@ -114,5 +107,4 @@ private:
     // ===== 状态 =====
     bool  m_frozen       = false;
     bool  m_hasData      = false;   // 是否已接收过真实数据
-    int   m_frameCount   = 0;       // 帧计数（用于状态显示）
 };

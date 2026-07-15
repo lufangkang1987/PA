@@ -327,7 +327,6 @@ void CTSPA22SDriver::onDataReadyRead()
 
 void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 {
-    ++m_frameCount;
 
     if (frame.type == "Ts22w") {
         // === 常规 PA 扫描 ===

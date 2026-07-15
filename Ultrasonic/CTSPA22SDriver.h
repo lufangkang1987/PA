@@ -74,10 +74,10 @@ public:
 
     // ========== IDriver 接口 ==========
     bool connectDevice(const QString &ip,
-                       quint16 cmdPort  = 51007,
-                       quint16 dataPort = 51005);
+                       quint16 cmdPort  = DefaultCmdPort,
+                       quint16 dataPort = DefaultDataPort);
     bool connectDevice(const QString &ip, quint16 port) override
-    { return connectDevice(ip, 51007, port); }
+    { return connectDevice(ip, DefaultCmdPort, port); }
     bool connectDevice(ConnectionMode mode) override;
     void disconnectDevice() override;
     bool isConnected() const override;
@@ -86,20 +86,9 @@ public:
 
     // ========== 连接模式便捷方法 ==========
 
-    /// 无线连接：自动使用默认 WIFI IP 192.168.0.51
-    bool connectViaWifi()    { return connectDevice(ConnectionMode::Wireless); }
-
-    /// 有线连接：自动使用默认网口 IP 192.168.22.121
-    bool connectViaEthernet(){ return connectDevice(ConnectionMode::Wired); }
-
-    ConnectionMode connectionMode() const { return m_connectionMode; }
-    void setConnectionMode(ConnectionMode mode) { m_connectionMode = mode; }
-
     // ---- 默认连接参数（来自使用说明书 V3） ----
     static constexpr const char *DefaultWifiIP       = "192.168.0.51";
     static constexpr const char *DefaultWiredIP      = "192.168.22.121";
-    static constexpr const char *DefaultWifiSSID     = "PA22S-";
-    static constexpr const char *DefaultWifiPassword = "12345678";
     static constexpr quint16 DefaultCmdPort  = 51007;
     static constexpr quint16 DefaultDataPort = 51005;
 
@@ -124,8 +113,8 @@ public:
     void setCommonRDelay() override;
     void setTFMImageProcess(double subtract, double supress, double smooth) override;
     void resetEncoder(int idx) override;
-    void setACG(bool enabled, const PAParams &params);
-    void setTCG(bool enabled, const PAParams &params);
+    void setACG(bool enabled, const PAParams &params) override;
+    void setTCG(bool enabled, const PAParams &params) override;
 
     // -------- 扫查配置 setter（供"应用法则"批量下发）--------
     void setVelocity(float mps) override;
@@ -140,44 +129,10 @@ public:
     void powerOff() override;
 
     /// 获取仪器温度
-    void queryTemperature();
+    void queryTemperature() override;
 
     /// 获取仪器电压
-    void queryVoltage();
-
-signals:
-    // -------- 连接状态 --------
-    void connectionChanged(bool connected);
-    void statusChanged(const QString &status);
-    void errorOccurred(const QString &error);
-
-    // -------- A 扫描数据 --------
-    /// 单声束波形（用于 A 扫描显示）
-    /// @param waveform   已按检波模式归一化的采样点
-    /// @param beamIndex  当前显示的声束编号 (0~127)
-    /// @param frameIndex 递增帧序号（用于判定数据连续性）
-    /// @param rectifyMode 检波模式: 0=全波,1=正半波,2=负半波,3=射频
-    void waveformReady(const QVector<double> &waveform,
-                       int beamIndex, int frameIndex, int rectifyMode);
-
-    /// 全部 128 声束波形（用于 B 扫描 softwareImaging）
-    void multiBeamWaveformsReady(const QVector<QVector<double>> &waveforms);
-    void dataPacketReady(const DataPacket &packet);
-
-    // -------- 闸门读数 --------
-    void gateReadingsReady(char gate, double amplitude, double path);
-
-    // -------- 编码器位置 --------
-    void encoderPositionChanged(int position);
-    void frameStatisticsChanged(int frameDiff, quint64 droppedFrames);
-    void scanRulePositionsReady(const QVector<double> &positions);
-
-    // -------- TFM 数据 --------
-    void tfmImageReady(const QVector<int> &image);
-
-    // -------- 遥测 --------
-    void temperatureReceived(double tempC);
-    void voltageReceived(double voltage);
+    void queryVoltage() override;
 
 private slots:
     void onCmdConnected();
@@ -214,7 +169,6 @@ private:
     bool         m_dataReady   = false;
     int          m_scanType    = 0;
     int          m_beamCount   = 128;
-    int          m_frameCount  = 0;
     bool         m_hasLastWaveFrame = false;
     quint16      m_lastWaveFrame = 0;
     int          m_lastReportedFrameDiff = -1;

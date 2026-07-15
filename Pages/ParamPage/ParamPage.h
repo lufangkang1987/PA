@@ -10,14 +10,14 @@ class QDoubleSpinBox;
 class QSpinBox;
 class QLabel;
 class QPushButton;
-class IDriver;
+class ParameterDispatcher;
 
 class ParamPage : public QFrame
 {
     Q_OBJECT
 public:
     explicit ParamPage(QWidget *parent = nullptr);
-    void setDriver(IDriver *driver);
+    void setDispatcher(ParameterDispatcher *dispatcher);
     bool initializeParams();
     void applyCurrentParams();
 
@@ -151,9 +151,6 @@ private:
     QComboBox     *m_filterCombo     = nullptr;
     QComboBox     *m_videoCombo      = nullptr;
 
-    // 硬件下发
-    void syncToDriver(char category);
-
     // C扫扫描按钮
     QPushButton   *m_scanBtn         = nullptr;
     bool           m_scanning        = false;
@@ -171,5 +168,5 @@ private:
     int            m_activeRow       = -1;  // 当前展开的导航项，-1=全部折叠
 
     PAParams m_params;
-    IDriver *m_driver = nullptr;
+    ParameterDispatcher *m_dispatcher = nullptr;
 };

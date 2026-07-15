@@ -1,5 +1,8 @@
 #include "BScanWidget.h"
+#include "PAParams.h"
 #include <QPainter>
+#include "Theme.h"
+#include "ColorMap.h"
 #include <QtMath>
 #include <algorithm>
 #include <cstring>
@@ -25,69 +28,11 @@ BScanWidget::BScanWidget(QWidget *parent) : QWidget(parent)
     m_displayImage = buildDisplayImage();
 }
 
-// ================================================================
-//  颜色映射 —— 移植自 MFC Value2Color4 / hsv2rgb
-// ================================================================
-
-QRgb BScanWidget::hsv2rgb(double h, double s, double v)
-{
-    s /= 100.0;
-    v /= 100.0;
-    double c = v * s;
-    double x = c * (1.0 - qAbs(std::fmod(h / 60.0, 2.0) - 1.0));
-    double m = v - c;
-    double r = 0.0, g = 0.0, b = 0.0;
-
-    if (h < 60.0)        { r = c; g = x; b = 0; }
-    else if (h < 120.0)  { r = x; g = c; b = 0; }
-    else if (h < 180.0)  { r = 0; g = c; b = x; }
-    else if (h < 240.0)  { r = 0; g = x; b = c; }
-    else if (h < 300.0)  { r = x; g = 0; b = c; }
-    else                 { r = c; g = 0; b = x; }
-
-    int ri = static_cast<int>((r + m) * 255.0 + 0.5);
-    int gi = static_cast<int>((g + m) * 255.0 + 0.5);
-    int bi = static_cast<int>((b + m) * 255.0 + 0.5);
-
-    return qRgb(qBound(0, ri, 255), qBound(0, gi, 255), qBound(0, bi, 255));
-}
-
-QRgb BScanWidget::valueToColor(unsigned int value)
-{
-    // 5 段 HSV 颜色映射，与 MFC Value2Color4 完全一致
-    double h = 0.0, s = 0.0, v = 0.0;
-
-    if (value <= 60) {
-        h = 240.0 - (24.0 / 61.0) * value;
-        s = (73.0 / 61.0) * value;
-        v = 100.0 - (51.0 / 61.0) * value;
-    } else if (value <= 102) {
-        h = 216.0 - (75.0 / 42.0) * (value - 61);
-        s = 73.0 + (7.0 / 42.0) * (value - 61);
-        v = 49.0 + (6.0 / 42.0) * (value - 61);
-    } else if (value <= 179) {
-        h = 141.0 - (84.0 / 76.0) * (value - 103);
-        s = 86.0 - (15.0 / 76.0) * (value - 103);
-        v = 55.0 + (36.0 / 76.0) * (value - 103);
-    } else if (value <= 230) {
-        h = 57.0 - (56.0 / 50.0) * (value - 180);
-        s = 71.0 + (5.0 / 50.0) * (value - 180);
-        v = 91.0 - (9.0 / 50.0) * (value - 180);
-    } else { // value <= 255
-        h = 1.0;
-        s = 86.0 + (13.0 / 25.0) * (value - 231);
-        v = 82.0 + (17.0 / 25.0) * (value - 231);
-    }
-
-    return hsv2rgb(h, s, v);
-}
-
 void BScanWidget::buildColorLUT()
 {
     m_colorLUT.resize(256);
-    for (int i = 0; i < 256; ++i) {
-        m_colorLUT[i] = valueToColor(static_cast<unsigned int>(i));
-    }
+    for (int i = 0; i < 256; ++i)
+        m_colorLUT[i] = amplitudeToColor(i);
 }
 
 // ================================================================
@@ -96,62 +41,23 @@ void BScanWidget::buildColorLUT()
 
 void BScanWidget::computeScanRules()
 {
-    if (m_scanType == 3) {  // TFM — 不适用 B 扫
-        for (int k = 0; k < MaxBeams; ++k) {
-            m_rules[k].x = 0.0;
-            m_rules[k].ang = 0.0;
-        }
+    if (m_scanType == 3) {
+        std::fill_n(m_rules, MaxBeams, ScanRule{});
         return;
     }
-
-    int num;
-    if (m_scanType == 0) {
-        // S-Scan: 声束数由 BeamCount 决定
-        num = m_beamCount;
-        if (num < 1) num = 1;
-
-        const double angRange = m_angleTo - m_angleFrom;
-        for (int k = 0; k < num; ++k) {
-            const double ang = m_angleFrom + k * angRange / (num - 1);
-            m_rules[k].ang = ang;
-
-            // S 扫声束从扇出点出发，在图像上均匀分布
-            // 默认以 x=255 为中心，按角度差分配偏移
-            double x = 255.0;
-            if (qAbs(angRange) > 0.01) {
-                x = 255.0 + (ang - (m_angleFrom + m_angleTo) / 2.0) * 400.0 / qAbs(angRange);
-            }
-            m_rules[k].x = qBound(0.0, x, 511.0);
-        }
-    } else if (m_scanType == 1) {
-        // L-Scan: 电子线性扫描
-        num = m_eleEnd - m_eleStart + 1 - m_eleAperture + 1;
-        if (num < 1) num = 1;
-
-        const double angRad = m_angleFrom * M_PI / 180.0;
-        double usableW = 512.0 - 400.0 * qSin(angRad);
-        if (usableW < 1.0) usableW = 1.0;
-
-        for (int k = 0; k < num; ++k) {
-            m_rules[k].x = k * usableW / (num - 1);
-            m_rules[k].ang = m_angleFrom;
-        }
-    } else {
-        // CL-Scan: 环形阵列
-        num = m_probeCount;
-        if (num < 1) num = 1;
-
-        for (int k = 0; k < num; ++k) {
-            m_rules[k].x = k * 512.0 / (num - 1);
-            m_rules[k].ang = m_angleFrom;
-        }
-    }
-
-    // 未使用的规则置零
-    for (int k = num; k < MaxBeams; ++k) {
-        m_rules[k].x = 0.0;
-        m_rules[k].ang = 0.0;
-    }
+    PAParams p;
+    p.scanType    = m_scanType;
+    p.beamCount   = m_beamCount;
+    p.angleFrom   = m_angleFrom;
+    p.angleTo     = m_angleTo;
+    p.angle       = m_angleFrom;
+    p.range       = m_range;
+    p.probeCount  = m_probeCount;
+    p.probePitch  = 1.0f;
+    p.eleStart    = m_eleStart;
+    p.eleEnd      = m_eleEnd;
+    p.eleAperture = m_eleAperture;
+    ::computeScanRules(p, nullptr, nullptr, m_rules);
 }
 
 // ================================================================
@@ -162,66 +68,11 @@ void BScanWidget::softwareImaging(
     const std::vector<std::array<uint8_t, 400>> &waveforms,
     int beamCount, uint8_t *img)
 {
-    if (beamCount < 2) {
-        // 单声束或无数据：填充背景
-        std::memset(img, 0xFF, SImageSize);
-        return;
-    }
-
-    // 预计算每条声束的 sin/cos
-    double cosA[128], sinA[128];
-    for (int i = 0; i < beamCount; ++i) {
-        cosA[i] = qCos(m_rules[i].ang * M_PI / 180.0);
-        sinA[i] = qSin(m_rules[i].ang * M_PI / 180.0);
-    }
-
-    // 逐像素扫描：从屏幕底部 (i=399) 到顶部 (i=0)
-    for (int i = 399; i >= 0; --i) {
-        int b = 0;  // 当前搜索到的声束索引（跨像素保持，单调递增）
-        for (int j = 0; j < 512; ++j) {
-
-            // 寻找像素 (j,i) 右侧的第一条声束线
-            double x1;
-            for (; b < beamCount; ++b) {
-                x1 = (j - m_rules[b].x) * cosA[b] - i * sinA[b];
-                if (x1 < 0) break;  // 像素在声束 b 的左侧
-            }
-
-            if (b == 0 || b == beamCount) {
-                // 像素在所有声束的左侧或右侧 → 背景
-                *img = 0xFF;
-            } else {
-                // 像素位于声束 b-1 和 b 之间
-                const double y1 = i * cosA[b] + (j - m_rules[b].x) * sinA[b];
-                const double y0 = i * cosA[b - 1] + (j - m_rules[b - 1].x) * sinA[b - 1];
-                const int n0 = static_cast<int>(y0 + 1.0);
-                const int n1 = static_cast<int>(y1 + 1.0);
-
-                if (n0 >= 400 || n1 >= 400) {
-                    *img = 0xFF;
-                } else {
-                    // 计算像素到声束 b-1 的垂直距离
-                    const double x0 = (j - m_rules[b - 1].x) * cosA[b - 1] - i * sinA[b - 1];
-                    const double d = x0 - x1;  // 两声束间的总垂直距离
-
-                    const int v0 = waveforms[b - 1][n0];
-                    const int v1 = waveforms[b][n1];
-
-                    // 三段式插值（与 MFC 一致）
-                    if (x0 < 0.25 * d)
-                        *img = static_cast<uint8_t>(v0);
-                    else if (x0 < 0.75 * d)
-                        *img = static_cast<uint8_t>((v0 + v1) / 2);
-                    else
-                        *img = static_cast<uint8_t>(v1);
-
-                    if (*img > 250)
-                        *img = 250;
-                }
-            }
-            ++img;  // 下一个像素
-        }
-    }
+    const int count = qBound(0, beamCount, MaxBeams);
+    const uint8_t *waveP[MaxBeams];
+    for (int b = 0; b < count; ++b)
+        waveP[b] = waveforms[b].data();
+    ::softwareImaging(waveP, m_rules, count, img);
 }
 
 // ================================================================
@@ -233,7 +84,7 @@ QImage BScanWidget::buildDisplayImage() const
     QImage img(512, 400, QImage::Format_RGB32);
     if (!m_hasData) {
         // 无数据时显示纯深色背景，提示"等待数据…"
-        img.fill(QColor(7, 17, 27).rgb());
+        img.fill(ThemeColor::DeepBg.rgb());
         return img;
     }
 
@@ -253,7 +104,7 @@ QImage BScanWidget::buildDisplayImage() const
             const uint8_t val = src[x];
             if (val >= 255) {
                 // 背景区域保持深色
-                dst[x] = QColor(7, 17, 27).rgb();
+                dst[x] = ThemeColor::DeepBg.rgb();
             } else if (val == 0) {
                 // 零幅度 → 白色（与 MFC 一致）
                 dst[x] = qRgb(255, 255, 255);
@@ -305,7 +156,6 @@ void BScanWidget::setMultiBeamData(const QVector<QVector<double>> &waves, bool i
     softwareImaging(rawWaves, m_beamCount, m_sImage.data());
 
     m_hasData = true;
-    ++m_frameCount;
 
     // 重建显示图像并触发重绘
     m_displayImage = buildDisplayImage();
@@ -350,7 +200,7 @@ void BScanWidget::setFrozen(bool frozen)
 void BScanWidget::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
-    p.fillRect(rect(), QColor(7, 17, 27));
+    p.fillRect(rect(), ThemeColor::DeepBg);
 
     // 自适应边距
     const int ml = qMin(46, qMax(18, width() / 9));
@@ -368,7 +218,7 @@ void BScanWidget::paintEvent(QPaintEvent *)
     }
 
     // ── 轴标签 ──
-    QFont axisFont("Microsoft YaHei", 8);
+    QFont axisFont(ThemeFont::Ui, 8);
     p.setFont(axisFont);
     const QFontMetrics afm(axisFont);
 
@@ -426,7 +276,7 @@ void BScanWidget::paintEvent(QPaintEvent *)
     // ── 数据状态提示 ──
     if (!m_hasData) {
         p.setPen(QColor(100, 140, 160));
-        QFont hintFont("Microsoft YaHei", 14);
+        QFont hintFont(ThemeFont::Ui, 14);
         p.setFont(hintFont);
         p.drawText(plot, Qt::AlignCenter,
                    QString::fromUtf8("等待数据…")); // "等待数据…"

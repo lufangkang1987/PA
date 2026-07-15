@@ -1,10 +1,9 @@
 #pragma once
 #include <QWidget>
 #include <QLabel>
-#include <QPushButton>
 #include <QResizeEvent>
-#include <QPainter>
 #include <QVector>
+#include <QPainter>
 #include "DataTypes.h"
 struct PAParams;
 class AScanWidget;

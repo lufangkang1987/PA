@@ -1,5 +1,5 @@
 #include "ParamPage.h"
-#include "IDriver.h"
+#include "ParameterDispatcher.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -208,27 +208,27 @@ void ParamPage::buildTransmitPage()
     // ── 硬件下发 ──
     connect(m_voltCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params.highVoltage = v;
-        if (m_driver) m_driver->setHighVoltage(v);
+        if (m_dispatcher) m_dispatcher->setHighVoltage(v);
     });
     connect(m_pulseWidthSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
         m_params.pulseWidth = v;
-        if (m_driver) m_driver->setPulseWidth(v);
+        if (m_dispatcher) m_dispatcher->setPulseWidth(v);
     });
     connect(m_prfSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
         m_params.prf = v;
-        if (m_driver) m_driver->setPRF(v);
+        if (m_dispatcher) m_dispatcher->setPRF(v);
     });
     connect(m_rangeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double v) {
         m_params.range = static_cast<float>(v);
-        if (m_driver) m_driver->setRange(static_cast<float>(v));
+        if (m_dispatcher) m_dispatcher->setRange(static_cast<float>(v));
     });
     connect(m_tempCorrectCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params.tempCorrect = v;
-        if (m_driver) m_driver->setTemperatureCompensation(v != 0);
+        if (m_dispatcher) m_dispatcher->setTemperatureCompensation(v != 0);
     });
     connect(m_aDataLenCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params.aDataLen = v;
-        if (m_driver) m_driver->setADataLen(v);
+        if (m_dispatcher) m_dispatcher->setADataLen(v);
     });
 
     layout->addWidget(form);
@@ -273,12 +273,12 @@ void ParamPage::buildReceivePage()
     // ── 硬件下发 ──
     connect(m_aGainSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double v) {
         m_params.aGain = static_cast<float>(v);
-        if (m_driver) m_driver->setAnalogGain(static_cast<float>(v));
+        if (m_dispatcher) m_dispatcher->setAnalogGain(static_cast<float>(v));
         emit beamInfoChanged(m_params.curBeam, v);
     });
     connect(m_dGainSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double v) {
         m_params.dGain = static_cast<float>(v);
-        if (m_driver) m_driver->setDigitalGain(static_cast<float>(v));
+        if (m_dispatcher) m_dispatcher->setDigitalGain(static_cast<float>(v));
     });
     connect(m_beamNoSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
         m_params.curBeam = v;
@@ -286,21 +286,21 @@ void ParamPage::buildReceivePage()
     });
     connect(m_rectifyCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params.rectify = v;
-        if (m_driver) m_driver->setRectify(v);
+        if (m_dispatcher) m_dispatcher->setRectify(v);
     });
     connect(m_filterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params.filter = v;
-        if (m_driver) m_driver->setFilter(v);
+        if (m_dispatcher) m_dispatcher->setFilter(v);
     });
     connect(m_videoCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params.video = v;
-        if (m_driver) {
+        if (m_dispatcher) {
             if (v < 5) {
-                m_driver->setASmooth(false);
-                m_driver->setVideoDetect(true);
+                m_dispatcher->setASmooth(false);
+                m_dispatcher->setVideoDetect(true);
             } else {
-                m_driver->setVideoDetect(false);
-                m_driver->setASmooth(true);
+                m_dispatcher->setVideoDetect(false);
+                m_dispatcher->setASmooth(true);
             }
         }
     });
@@ -934,12 +934,12 @@ void ParamPage::onGateParamChanged()
     m_params.gateTrace[g]     = m_gateTraceCombo->currentIndex();
 
     // 下发到硬件
-    if (m_driver)
-        m_driver->setGate(gateName,
+    if (m_dispatcher)
+        m_dispatcher->setGate(gateName,
                           m_params.gateStart[g],
                           m_params.gateWidth[g],
                           m_params.gateThreshold[g],
-                          m_params.gateMeasure[g] == 0 ? "peak" : "edge");
+                          m_params.gateMeasure[g]);
 
     emit gateParamsChanged();
 }
@@ -982,9 +982,9 @@ void ParamPage::onGateDragged(int gate, float start, float threshold)
     m_gateTraceCombo->blockSignals(false);
 
     // 下发硬件
-    if (m_driver)
-        m_driver->setGate(gn, start, m_params.gateWidth[gate], threshold,
-                          m_params.gateMeasure[gate] == 0 ? "peak" : "edge");
+    if (m_dispatcher)
+        m_dispatcher->setGate(gn, start, m_params.gateWidth[gate], threshold,
+                          m_params.gateMeasure[gate]);
 
     emit gateParamsChanged();
 }
@@ -1060,57 +1060,7 @@ void ParamPage::setCalibratedCoderDeg(float mmPerPulse)
 
 void ParamPage::onApplyLaw()
 {
-    if (!m_driver) return;
-
-    // ── 1. 同步扫查几何参数到 Driver（不单独发命令，由 setScanType 统一构造 JSON）──
-    m_driver->setVelocity(static_cast<float>(m_params.lVelocity));
-    m_driver->setProbeGeometry(m_params.probeCount, m_params.probeFreq, m_params.probePitch);
-    m_driver->setElementGeometry(m_params.eleStart, m_params.eleEnd, m_params.eleAperture);
-
-    if (m_params.scanType == 0)  // S 扫
-        m_driver->setSscanAngles(m_params.angleFrom, m_params.angleTo);
-    else                         // L 扫
-        m_driver->setLscanAngle(m_params.angle);
-
-    m_driver->setFocusMm(m_params.focus);
-    m_driver->setWedgeGeometry(m_params.wedgeEnable != 0, m_params.wedgeAngle,
-                               m_params.wedgeVelocity, m_params.wedgeHeight);
-
-    // ── 2. 下发扫查类型（触发硬件计算聚焦法则）──
-    // setScanType 内部会自动处理采集的停止/重启
-    m_driver->setScanType(m_params.scanType);
-
-    // ── 3. 重发独立参数（确保硬件状态与 UI 一致）──
-    m_driver->setAnalogGain(m_params.aGain);
-    m_driver->setDigitalGain(m_params.dGain);
-    m_driver->setTemperatureCompensation(m_params.tempCorrect != 0);
-    m_driver->setHighVoltage(m_params.highVoltage);
-    m_driver->setPulseWidth(m_params.pulseWidth);
-    m_driver->setPRF(m_params.prf);
-    m_driver->setRange(m_params.range);
-    m_driver->setRectify(m_params.rectify);
-    m_driver->setFilter(m_params.filter);
-    m_driver->setADataLen(m_params.aDataLen);
-
-    // 视频检波 / 平滑
-    if (m_params.video < 5) {
-        m_driver->setASmooth(false);
-        m_driver->setVideoDetect(true);
-    } else {
-        m_driver->setVideoDetect(false);
-        m_driver->setASmooth(true);
-    }
-
-    // ── 4. 重发闸门参数 ──
-    static const char gateNames[] = {'A', 'B', 'C'};
-    for (int g = 0; g < 3; ++g) {
-        m_driver->setGate(gateNames[g],
-                          m_params.gateStart[g],
-                          m_params.gateWidth[g],
-                          m_params.gateThreshold[g],
-                          m_params.gateMeasure[g] == 0 ? "peak" : "edge");
-    }
-
+    if (m_dispatcher) m_dispatcher->applyLaw(m_params);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1721,7 +1671,7 @@ void ParamPage::onLoadParams()
 
     deserializeParams(doc.object());
     syncUiFromParams();
-    if (m_driver && m_driver->isConnected())
+    if (m_dispatcher && m_dispatcher->isConnected())
         applyCurrentParams();
 
     // 加载后自动展开参数面板，确保用户能看到更新后的值
@@ -2156,7 +2106,7 @@ ParamPage::ParamPage(QWidget *parent) : QFrame(parent)
     setupUi();
 }
 
-void ParamPage::setDriver(IDriver *driver)
+void ParamPage::setDispatcher(ParameterDispatcher *dispatcher)
 {
-    m_driver = driver;
+    m_dispatcher = dispatcher;
 }

@@ -6,6 +6,8 @@
 // 本文件零 Qt 依赖，可被 core/ 算法层、通信层、UI 层共用。
 // ============================================================
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -14,14 +16,12 @@
 // ============================================================
 
 constexpr int S22_SP         = 10;
-constexpr double S22_SP_TFOCUS  = 1.25;
-constexpr double S22_SP_RFOCUS  = 0.625;
-
 constexpr int MaxBeams        = 128;
 constexpr int WaveSampleCount = 400;
 constexpr int MaxCScanFrames  = 2776;
-constexpr int CScanWidth      = 512;
-constexpr int SImageSize      = 512 * 400;     // 204800
+constexpr int CScanWidth         = 512;
+constexpr int CScanLinesPerPage   = 925;               // 2775 / 3 (同 MFC 单页行数)
+constexpr int SImageSize         = 512 * 400;          // 204800
 constexpr int TFMImageSize    = 256 * 256;     // 65536
 
 // ============================================================
@@ -126,6 +126,54 @@ struct AScanData
 // ============================================================
 
 enum class ConnectionMode {
-    Wired    = 0,  // 有线：USB 转网口 → 仪器 IP 192.168.22.121，PC 需同网段静态 IP
-    Wireless = 1   // 无线：USB 转 WIFI → 仪器热点 PA22S-xxxxxx，密码 12345678，IP 192.168.0.51
+    Wired    = 0,
+    Wireless = 1
 };
+
+// ============================================================
+//  共享软件成像算法（BScanWidget + CScanEngine 共用）
+// ============================================================
+// 输入 waveP[beamCount][400] + rules[beamCount]，输出 SImage[512*400]
+inline void softwareImaging(const uint8_t *const *waveP, const ScanRule *rules,
+                            int beamCount, uint8_t *outImage)
+{
+    std::fill_n(outImage, SImageSize, uint8_t(0xFF));
+    if (beamCount < 2) return;
+
+    double cosA[MaxBeams], sinA[MaxBeams];
+    for (int b = 0; b < beamCount; ++b) {
+        const double rad = rules[b].ang * 3.14159265358979323846 / 180.0;
+        cosA[b] = std::cos(rad);
+        sinA[b] = std::sin(rad);
+    }
+
+    uint8_t *out = outImage;
+    for (int y = 399; y >= 0; --y) {
+        int b = 0;
+        for (int x = 0; x < CScanWidth; ++x, ++out) {
+            double x1 = 0.0;
+            for (; b < beamCount; ++b) {
+                x1 = (x - rules[b].x) * cosA[b] - y * sinA[b];
+                if (x1 < 0.0) break;
+            }
+            if (b == 0 || b == beamCount) continue;
+
+            const double y1 = y * cosA[b] + (x - rules[b].x) * sinA[b];
+            const double y0 = y * cosA[b - 1] + (x - rules[b - 1].x) * sinA[b - 1];
+            const int n0 = int(y0 + 1.0);
+            const int n1 = int(y1 + 1.0);
+            if (n0 < 0 || n1 < 0 || n0 >= WaveSampleCount || n1 >= WaveSampleCount)
+                continue;
+
+            const double x0 = (x - rules[b - 1].x) * cosA[b - 1] - y * sinA[b - 1];
+            const double d = x0 - x1;
+            const int v0 = waveP[b - 1][n0];
+            const int v1 = waveP[b][n1];
+            int value = v1;
+            if (x0 < 0.25 * d) value = v0;
+            else if (x0 < 0.75 * d) value = (v0 + v1) / 2;
+            *out = uint8_t(std::min(value, 250));
+        }
+    }
+}
+

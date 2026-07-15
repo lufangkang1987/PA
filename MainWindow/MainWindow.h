@@ -5,10 +5,14 @@
 class QComboBox;
 class QLabel;
 class QPushButton;
+class QVBoxLayout;
 class HomePage;
 class ParamPage;
 class MeasurePage;
 class IDriver;
+class CalibrationController;
+class ConnectionManager;
+class CScanIOManager;
 class CScanEngine;
 class QThread;
 
@@ -26,6 +30,13 @@ protected:
 
 private:
     void setupUi();
+    void buildHeader(QWidget *shell, QVBoxLayout *root);
+    void buildCentral(QVBoxLayout *root);
+    void buildDriverAndEngine();
+    void wirePageSignals();
+    void wireCScanIO();
+    void wireCalibration();
+    void applyGlobalStyleSheet();
     void wireDriverSignals();
     bool loadParamsFile(const QString &path);
     void updatePcBattery();
@@ -39,21 +50,18 @@ private:
     DataPacket    m_latestPacket;
     QVector<double> m_scanRulePositions;
     bool          m_hasLatestPacket = false;
-    bool          m_calibrating = false;
-    int           m_calibrationItem = -1;
-    int           m_calibrationTargetPercent = 80;
-    bool          m_encoderCalibrating = false;
-    int           m_encoderCalibrationStart = 0;
 
-    // 连接模式 UI
-    QComboBox    *m_modeCombo = nullptr;
-    QLabel       *m_deviceLabel = nullptr;
-    QLabel       *m_ipLabel = nullptr;
-    QLabel       *m_temperatureLabel = nullptr;
-    QLabel       *m_pcBatteryLabel = nullptr;
-    QLabel       *m_paBatteryLabel = nullptr;
+    CalibrationController *m_calController = nullptr;
+    ConnectionManager     *m_connManager = nullptr;
+    CScanIOManager        *m_ioManager = nullptr;
 
-    // 操作按钮
-    QPushButton  *m_connectBtn = nullptr;
-    QPushButton  *m_acquireBtn = nullptr;
+    // 顶部栏控件（UI 属 MainWindow，信号委托给 ConnectionManager）
+    QComboBox *m_modeCombo = nullptr;
+    QLabel    *m_deviceLabel = nullptr;
+    QLabel    *m_ipLabel = nullptr;
+
+    // 遥测标签
+    QLabel *m_temperatureLabel = nullptr;
+    QLabel *m_pcBatteryLabel = nullptr;
+    QLabel *m_paBatteryLabel = nullptr;
 };

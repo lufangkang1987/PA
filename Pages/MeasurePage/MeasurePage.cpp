@@ -1,7 +1,6 @@
 #include "MeasurePage.h"
 #include <QVBoxLayout>
 #include <QFrame>
-#include <QLabel>
 #include <QMessageBox>
 #include <cmath>
 
@@ -157,7 +156,6 @@ void MeasurePage::updateGateReadings(char gate, double amplitudePercent, double 
         m_gateAAmpReading->setValue(amplitudePercent, 1);
         m_gateAPathReading->setValue(soundPathMm, 1);
         // 水平/垂直：需配合编码器+闸门触发逻辑，暂无数据
-        m_aHorizontalReading->setValue("--");
         m_aHorizontalReading->setValue(horizontal, 1);
         m_aVerticalReading->setValue(vertical, 1);
     } else if (gate == 'B') {

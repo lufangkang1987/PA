@@ -101,6 +101,10 @@
     <ClCompile Include="Pages\ParamPage\ParamPage.cpp" />
     <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp" />
     <ClCompile Include="Ultrasonic\AppState.cpp" />
+    <ClCompile Include="Ultrasonic\CalibrationController.cpp" />
+    <ClCompile Include="Ultrasonic\ConnectionManager.cpp" />
+    <ClCompile Include="Ultrasonic\CScanIOManager.cpp" />
+    <ClCompile Include="Ultrasonic\ParameterDispatcher.cpp" />
     <ClCompile Include="Ultrasonic\CTSPA22SDriver.cpp" />
     <ClCompile Include="Ultrasonic\CScanDataCodec.cpp" />
     <ClCompile Include="Ultrasonic\CScanEngine.cpp" />
@@ -131,6 +135,12 @@
     <QtMoc Include="Pages\MeasurePage\MeasurePage.h" />
     <QtMoc Include="Pages\HomePage\HomePage.h" />
     <ClInclude Include="Ultrasonic\DataTypes.h" />
+    <QtMoc Include="Ultrasonic\CalibrationController.h" />
+    <QtMoc Include="Ultrasonic\ConnectionManager.h" />
+    <QtMoc Include="Ultrasonic\CScanIOManager.h" />
+    <QtMoc Include="Ultrasonic\ParameterDispatcher.h" />
+    <ClInclude Include="Ultrasonic\ColorMap.h" />
+    <ClInclude Include="Ultrasonic\Theme.h" />
     <ClInclude Include="Ultrasonic\CScanDataCodec.h" />
     <QtMoc Include="Ultrasonic\IDriver.h" />
     <ClInclude Include="Ultrasonic\PAParams.h" />

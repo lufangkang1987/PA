@@ -35,9 +35,6 @@
     <ClCompile Include="Widgets\CScanWidget\CScanWidget.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Ultrasonic\AppState.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Ultrasonic\CTSPA22SDriver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -77,9 +74,6 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="Pages\HomePage\HomePage.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="Ultrasonic\AppState.h">
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\ParamPage.h">

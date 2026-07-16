@@ -45,19 +45,19 @@ void BScanWidget::computeScanRules()
         std::fill_n(m_rules, MaxBeams, ScanRule{});
         return;
     }
-    PAParams p;
-    p.scanType    = m_scanType;
-    p.beamCount   = m_beamCount;
-    p.angleFrom   = m_angleFrom;
-    p.angleTo     = m_angleTo;
-    p.angle       = m_angleFrom;
-    p.range       = m_range;
-    p.probeCount  = m_probeCount;
-    p.probePitch  = 1.0f;
-    p.eleStart    = m_eleStart;
-    p.eleEnd      = m_eleEnd;
-    p.eleAperture = m_eleAperture;
-    ::computeScanRules(p, nullptr, nullptr, m_rules);
+    ScanParams scan;
+    scan.scanType    = m_scanType;
+    scan.angleFrom   = m_angleFrom;
+    scan.angleTo     = m_angleTo;
+    scan.angle       = m_angleFrom;
+    scan.eleStart    = m_eleStart;
+    scan.eleEnd      = m_eleEnd;
+    scan.eleAperture = m_eleAperture;
+    ProbeParams probe;
+    probe.probeCount  = m_probeCount;
+    probe.probePitch  = 1.0f;
+    ::computeScanRules(scan, probe, m_range, m_beamCount,
+                       nullptr, nullptr, m_rules);
 }
 
 // ================================================================

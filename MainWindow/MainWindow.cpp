@@ -5,7 +5,6 @@
 #include "MeasurePage.h"
 #include "IDriver.h"
 #include "CTSPA22SDriver.h"
-#include "AppState.h"
 #include "CalibrationController.h"
 #include "ConnectionManager.h"
 #include "ParameterDispatcher.h"
@@ -272,7 +271,7 @@ void MainWindow::wirePageSignals()
 
     // C扫扫描按钮信号（来自 ParamPage 成像子页）
     connect(m_paramPage, &ParamPage::scanStarted, this, [this] {
-        if (m_calController->isCalibrating() || m_calController->isEncoderCalibrating() || AppState::instance()->replayState()) {
+        if (m_calController->isCalibrating() || m_calController->isEncoderCalibrating() || m_ioManager->isReplayActive()) {
             statusBar()->showMessage(QString::fromUtf8("请先退出校准或回放状态"));
             m_paramPage->finishScan();
             return;
@@ -312,6 +311,8 @@ void MainWindow::wireCScanIO()
             m_ioManager, &CScanIOManager::onCScanPageRequested);
     connect(m_paramPage, &ParamPage::exitReplayRequested,
             m_ioManager, &CScanIOManager::onExitReplayRequested);
+    connect(m_ioManager, &CScanIOManager::replayStateChanged,
+            m_calController, &CalibrationController::setReplayActive);
 }
 void MainWindow::wireCalibration()
 {
@@ -350,30 +351,25 @@ void MainWindow::wireDriverSignals()
     // ── CTSPA22SDriver 信号全连接 ──
     {
         connect(m_driver, &IDriver::connectionChanged, this, [this](bool ok) {
-            AppState::instance()->setConnected(ok);
             if (ok) m_paramPage->applyCurrentParams();
         });
         connect(m_driver, &IDriver::statusChanged, this, [this](const QString &s) {
             statusBar()->showMessage(s);
         });
         connect(m_driver, &IDriver::errorOccurred, this, [this](const QString &e) {
-            AppState::instance()->setConnected(false);
             statusBar()->showMessage(QString::fromUtf8("错误：") + e);
         });
         connect(m_driver, &IDriver::temperatureReceived, this, [this](double t) {
-            AppState::instance()->setTemperature(static_cast<float>(t));
             m_temperatureLabel->setText(QString::fromUtf8("温度: %1 °C").arg(t, 0, 'f', 1));
             updatePcBattery();
         });
         connect(m_driver, &IDriver::voltageReceived, this, [this](double v) {
-            AppState::instance()->setInputVoltage(static_cast<float>(v));
             const int percent = qBound(0, qRound((v - 9.2) / 2.3 * 100.0), 100);
             m_paBatteryLabel->setText(QString::fromUtf8("PA电量: %1%").arg(percent));
             updatePcBattery();
         });
-        connect(m_driver, &IDriver::encoderPositionChanged, this, [](int pos) {
-            AppState::instance()->setEncoderCount(static_cast<uint32_t>(pos));
-        });
+        connect(m_driver, &IDriver::encoderPositionChanged,
+                m_calController, &CalibrationController::setEncoderPosition);
         connect(m_driver, &IDriver::dataPacketReady,
                 m_cScanEngine, &CScanEngine::processPacket);
         connect(m_driver, &IDriver::scanRulePositionsReady,
@@ -382,13 +378,13 @@ void MainWindow::wireDriverSignals()
                 [this](const QVector<double> &positions) {
             m_scanRulePositions = positions.mid(0, MaxBeams);
         });
-        connect(m_driver, &IDriver::dataPacketReady, this, [this](const DataPacket &packet) {
+        connect(m_driver, &IDriver::dataPacketReady, this, [this](std::shared_ptr<DataPacket> packet) {
             m_latestPacket = packet;
             m_calController->setLatestPacket(packet);
-            m_hasLatestPacket = packet.beamCount > 0;
+            m_hasLatestPacket = packet && packet->beamCount > 0;
             if (!m_hasLatestPacket || !m_measurePage || !m_paramPage) return;
 
-            const GateReadings r = calculateReadings(m_paramPage->params(), packet, m_scanRulePositions);
+            const GateReadings r = calculateReadings(m_paramPage->params(), *packet, m_scanRulePositions);
             m_measurePage->updateGateReadings('A', r.aAmplitude, r.aSoundPathMm, r.angleDegrees, r.horizontalOffsetMm);
             m_measurePage->updateGateReadings('B', r.bAmplitude, r.bSoundPathMm, r.angleDegrees, r.horizontalOffsetMm);
 
@@ -410,8 +406,7 @@ void MainWindow::wireDriverSignals()
                 m_homePage, &HomePage::updateCScanMetrics);
         connect(m_cScanEngine, &CScanEngine::scanCompleted, this, [this] {
             if (m_driver) m_driver->stopAcquisition();
-            AppState::instance()->setStartState(false);
-            AppState::instance()->setReplayState(true);
+            m_ioManager->setReplayActive(true);
             m_homePage->setCScanReplayMode(true);
             m_paramPage->finishScan();
             statusBar()->showMessage("C scan completed");

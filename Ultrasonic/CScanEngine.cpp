@@ -157,34 +157,34 @@ QVector<ScanRule> CScanEngine::currentScanRules(int beamCount)
 
 int CScanEngine::encoderLine(const BeamWaveform &beam) const
 {
-    const uint32_t pulses = m_params.traceEnable
+    const uint32_t pulses = m_params.wp.traceEnable
         ? (beam.encFwd > beam.encRvs ? beam.encFwd - beam.encRvs : beam.encRvs - beam.encFwd)
-        : (m_params.direction == 1 ? beam.encRvs : beam.encFwd);
-    const double stepMm = std::max(0.1, static_cast<double>(m_params.degPerPoint));
-    return static_cast<int>(pulses * m_params.coderDeg / stepMm);
+        : (m_params.enc.direction == 1 ? beam.encRvs : beam.encFwd);
+    const double stepMm = std::max(0.1, static_cast<double>(m_params.img.degPerPoint));
+    return static_cast<int>(pulses * m_params.enc.coderDeg / stepMm);
 }
 
 int CScanEngine::gateStartSample(int gate) const
 {
-    return qBound(0, qRound(m_params.gateStart[gate] * WaveSampleCount
-                            / std::max(0.001f, m_params.range)), WaveSampleCount - 1);
+    return qBound(0, qRound(m_params.gate.gateStart[gate] * WaveSampleCount
+                            / std::max(0.001f, m_params.tx.range)), WaveSampleCount - 1);
 }
 
 int CScanEngine::gateWidthSamples(int gate) const
 {
-    return qBound(1, qRound(m_params.gateWidth[gate] * WaveSampleCount
-                            / std::max(0.001f, m_params.range)), WaveSampleCount);
+    return qBound(1, qRound(m_params.gate.gateWidth[gate] * WaveSampleCount
+                            / std::max(0.001f, m_params.tx.range)), WaveSampleCount);
 }
 
 void CScanEngine::initializeTrace(const DataPacket &packet)
 {
-    if (!m_params.traceEnable || packet.beamCount <= 0) return;
-    const int beam = qBound(0, m_params.curBeam, packet.beamCount - 1);
+    if (!m_params.wp.traceEnable || packet.beamCount <= 0) return;
+    const int beam = qBound(0, m_params.rx.curBeam, packet.beamCount - 1);
     const BeamWaveform &wave = packet.beams[beam];
     const int starts[2] = {gateStartSample(2), gateStartSample(1)};
     const int widths[2] = {gateWidthSamples(2), gateWidthSamples(1)};
     int *bases[2] = {&m_traceBaseC, &m_traceBaseB};
-    const float thresholds[2] = {m_params.gateThreshold[2], m_params.gateThreshold[1]};
+    const float thresholds[2] = {m_params.gate.gateThreshold[2], m_params.gate.gateThreshold[1]};
     for (int gate = 0; gate < 2; ++gate) {
         if (*bases[gate] != 0) continue;
         const int end = std::min(starts[gate] + widths[gate], WaveSampleCount);
@@ -202,7 +202,7 @@ void CScanEngine::applyTrace(DataPacket &packet)
     initializeTrace(packet);
     if (m_traceBaseB == 0 || m_traceBaseC == 0) return;
 
-    const int currentBeam = qBound(0, m_params.curBeam, packet.beamCount - 1);
+    const int currentBeam = qBound(0, m_params.rx.curBeam, packet.beamCount - 1);
     const int gateBStart = gateStartSample(1);
     const int gateBWidth = gateWidthSamples(1);
     int bStart = gateBStart;
@@ -216,13 +216,13 @@ void CScanEngine::applyTrace(DataPacket &packet)
     for (int beam = 0; beam < packet.beamCount; ++beam) {
         BeamWaveform &wave = packet.beams[beam];
         for (int i = gateCStart; i < std::min(gateCStart + gateCWidth, WaveSampleCount); ++i) {
-            if (wave.waveP[i] >= int(m_params.gateThreshold[2] * 2.5f)) {
+            if (wave.waveP[i] >= int(m_params.gate.gateThreshold[2] * 2.5f)) {
                 m_shiftA1[beam] = i - m_traceBaseC;
                 break;
             }
         }
         for (int i = qMax(0, bStart); i < std::min(bStart + gateBWidth, WaveSampleCount); ++i) {
-            if (wave.waveP[i] >= int(m_params.gateThreshold[1] * 2.5f)) {
+            if (wave.waveP[i] >= int(m_params.gate.gateThreshold[1] * 2.5f)) {
                 m_shiftA2[beam] = i - m_traceBaseB;
                 break;
             }
@@ -264,7 +264,9 @@ QVector<float> CScanEngine::buildTraceRow(const DataPacket &packet) const
 void CScanEngine::computeScanRules(int beamCount, ScanRule *rules)
 {
     const int count = qBound(1, beamCount, MaxBeams);
-    ::computeScanRules(m_params, &m_rulePositions, &m_explicitRules, rules,
+    ::computeScanRules(m_params.scan, m_params.probe, m_params.tx.range,
+                       m_params.global.beamCount,
+                       &m_rulePositions, &m_explicitRules, rules,
                        &m_imgSpanStart, &m_imgSpanEnd);
     Q_UNUSED(count);
 }
@@ -286,10 +288,10 @@ QVector<uint8_t> CScanEngine::softwareImaging(const DataPacket &packet)
 QVector<float> CScanEngine::buildCScanRow(const QVector<uint8_t> &sImage)
 {
     QVector<float> row(CScanWidth, 0.0f);
-    const int x1 = qBound(0, std::min(m_params.imgLineX1, m_params.imgLineX2), CScanWidth);
-    const int x2 = qBound(0, std::max(m_params.imgLineX1, m_params.imgLineX2), CScanWidth);
-    const int y1 = qBound(0, std::min(m_params.imgLineY1, m_params.imgLineY2), WaveSampleCount);
-    const int y2 = qBound(0, std::max(m_params.imgLineY1, m_params.imgLineY2), WaveSampleCount);
+    const int x1 = qBound(0, std::min(m_params.img.imgLineX1, m_params.img.imgLineX2), CScanWidth);
+    const int x2 = qBound(0, std::max(m_params.img.imgLineX1, m_params.img.imgLineX2), CScanWidth);
+    const int y1 = qBound(0, std::min(m_params.img.imgLineY1, m_params.img.imgLineY2), WaveSampleCount);
+    const int y2 = qBound(0, std::max(m_params.img.imgLineY1, m_params.img.imgLineY2), WaveSampleCount);
 
     for (int x = x1; x < x2; ++x) {
         uint8_t maximum = 0;
@@ -302,13 +304,13 @@ QVector<float> CScanEngine::buildCScanRow(const QVector<uint8_t> &sImage)
     return row;
 }
 
-void CScanEngine::processPacket(const DataPacket &packet)
+void CScanEngine::processPacket(std::shared_ptr<DataPacket> packet)
 {
-    if (!m_scanning || packet.beamCount <= 0)
+    if (!m_scanning || !packet || packet->beamCount <= 0)
         return;
 
-    DataPacket workingPacket = packet;
-    if (m_params.traceEnable)
+    DataPacket workingPacket = *packet;
+    if (m_params.wp.traceEnable)
         applyTrace(workingPacket);
 
     int lineIndex = encoderLine(workingPacket.beams[0]);
@@ -324,7 +326,7 @@ void CScanEngine::processPacket(const DataPacket &packet)
         }
     }
 
-    const QVector<float> row = m_params.traceEnable
+    const QVector<float> row = m_params.wp.traceEnable
         ? buildTraceRow(workingPacket)
         : buildCScanRow(softwareImaging(workingPacket));
     if (m_lastLine <= lineIndex) {
@@ -333,7 +335,7 @@ void CScanEngine::processPacket(const DataPacket &packet)
             m_archivedPackets.resize(lineIndex + 1);
         for (int y = first; y <= lineIndex; ++y) {
             std::copy(row.cbegin(), row.cend(), m_image.begin() + y * CScanWidth);
-            m_archivedPackets[y] = workingPacket;
+            m_archivedPackets[y] = *packet;
         }
     } else {
         std::fill(m_image.begin() + lineIndex * CScanWidth,
@@ -341,7 +343,7 @@ void CScanEngine::processPacket(const DataPacket &packet)
         std::copy(row.cbegin(), row.cend(), m_image.begin() + lineIndex * CScanWidth);
         if (m_archivedPackets.size() <= lineIndex)
             m_archivedPackets.resize(lineIndex + 1);
-        m_archivedPackets[lineIndex] = workingPacket;
+        m_archivedPackets[lineIndex] = *packet;
     }
 
     m_lastLine = lineIndex;
@@ -358,11 +360,11 @@ void CScanEngine::processPacket(const DataPacket &packet)
         const int deltaLines = m_capturedLines - m_lastMetricLines;
         const qint64 deltaMs = elapsedMs - m_lastMetricMs;
         const double speed = deltaMs > 0
-            ? deltaLines * m_params.degPerPoint * 1000.0 / deltaMs : 0.0;
+            ? deltaLines * m_params.img.degPerPoint * 1000.0 / deltaMs : 0.0;
         const double average = elapsedMs > 0
-            ? m_capturedLines * m_params.degPerPoint * 1000.0 / elapsedMs : 0.0;
+            ? m_capturedLines * m_params.img.degPerPoint * 1000.0 / elapsedMs : 0.0;
         emit metricsChanged(m_capturedLines, CScanLineCount,
-                            m_capturedLines * m_params.degPerPoint, speed, average);
+                            m_capturedLines * m_params.img.degPerPoint, speed, average);
         m_lastMetricMs = elapsedMs;
         m_lastMetricLines = m_capturedLines;
     }

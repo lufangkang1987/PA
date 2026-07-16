@@ -100,7 +100,7 @@
     <ClCompile Include="Pages\HomePage\HomePage.cpp" />
     <ClCompile Include="Pages\ParamPage\ParamPage.cpp" />
     <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp" />
-    <ClCompile Include="Ultrasonic\AppState.cpp" />
+
     <ClCompile Include="Ultrasonic\CalibrationController.cpp" />
     <ClCompile Include="Ultrasonic\ConnectionManager.cpp" />
     <ClCompile Include="Ultrasonic\CScanIOManager.cpp" />
@@ -121,9 +121,6 @@
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Widgets\CScanWidget\CScanWidget.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <QtMoc Include="Ultrasonic\AppState.h" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Ultrasonic\CTSPA22SDriver.h" />

@@ -1,6 +1,7 @@
 #pragma once
 #include <QMainWindow>
 #include "DataTypes.h"
+#include <memory>
 
 class QComboBox;
 class QLabel;
@@ -47,7 +48,7 @@ private:
     IDriver      *m_driver = nullptr;
     CScanEngine  *m_cScanEngine = nullptr;
     QThread      *m_cScanThread = nullptr;
-    DataPacket    m_latestPacket;
+    std::shared_ptr<DataPacket> m_latestPacket;
     QVector<double> m_scanRulePositions;
     bool          m_hasLatestPacket = false;
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "DataTypes.h"
 #include "PAParams.h"
+#include <memory>
 #include <QObject>
 
 class IDriver : public QObject
@@ -67,7 +68,7 @@ signals:
     void errorOccurred(const QString &error);
     void waveformReady(const QVector<double> &waveform, int beamIndex, int frameIndex, int rectifyMode);
     void multiBeamWaveformsReady(const QVector<QVector<double>> &waveforms);
-    void dataPacketReady(const DataPacket &packet);
+    void dataPacketReady(std::shared_ptr<DataPacket> packet);
     void scanRulePositionsReady(const QVector<double> &positions);
     void gateReadingsReady(char gate, double amplitude, double path);
     void encoderPositionChanged(int position);

@@ -400,12 +400,12 @@ void HomePage::selectCScanLine(int line)
 void HomePage::configureCScanView(const PAParams &params)
 {
     if (!m_cScan) return;
-    m_cScan->setAnalysisRect(params.anaLineX1, params.anaLineX2,
-                             params.anaLineY1, params.anaLineY2);
-    m_cScan->setImageColumnRange(params.imgLineX1, params.imgLineX2);
-    m_cScan->setPhysicalScale(params.degPerPoint,
-                              params.imgSpanStart, params.imgSpanEnd);
-    m_cScan->setProperty("scanStepMm", params.degPerPoint);
+    m_cScan->setAnalysisRect(params.ana.anaLineX1, params.ana.anaLineX2,
+                             params.ana.anaLineY1, params.ana.anaLineY2);
+    m_cScan->setImageColumnRange(params.img.imgLineX1, params.img.imgLineX2);
+    m_cScan->setPhysicalScale(params.img.degPerPoint,
+                              params.img.imgSpanStart, params.img.imgSpanEnd);
+    m_cScan->setProperty("scanStepMm", params.img.degPerPoint);
 }
 
 void HomePage::setCScanImageSpan(float startMm, float endMm)

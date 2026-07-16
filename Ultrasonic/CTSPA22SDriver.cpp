@@ -4,6 +4,7 @@
 #include <QHostAddress>
 #include <QThread>
 #include <QtMath>
+#include <memory>
 #include <cstdint>
 #include <cstring>
 
@@ -204,18 +205,33 @@ bool CTSPA22SDriver::connectDevice(const QString &ip,
         return true;
     }
 
+    // 连接前确保两个 socket 都处于未连接状态
+    if (m_cmdSocket->state() != QAbstractSocket::UnconnectedState)
+        m_cmdSocket->abort();
+    if (m_dataSocket->state() != QAbstractSocket::UnconnectedState)
+        m_dataSocket->abort();
+
     emit statusChanged(QString::fromUtf8("正在连接 %1 ...").arg(ip));
 
+    // ---- 命令通道 ----
     m_cmdSocket->connectToHost(QHostAddress(ip), cmdPort);
     if (!m_cmdSocket->waitForConnected(5000)) {
-        emit errorOccurred(QString::fromUtf8("命令通道连接失败: ") + m_cmdSocket->errorString());
+        const QString err = m_cmdSocket->errorString();
+        m_cmdSocket->abort();
+        emit errorOccurred(QString::fromUtf8("命令通道连接失败 (%1:%2): %3")
+                           .arg(ip).arg(cmdPort).arg(err));
         return false;
     }
 
+    // ---- 数据通道 ----
     m_dataSocket->connectToHost(QHostAddress(ip), dataPort);
     if (!m_dataSocket->waitForConnected(5000)) {
-        m_cmdSocket->disconnectFromHost();
-        emit errorOccurred(QString::fromUtf8("数据通道连接失败: ") + m_dataSocket->errorString());
+        const QString err = m_dataSocket->errorString();
+        m_dataSocket->abort();
+        m_cmdSocket->abort();
+        m_cmdReady = false;
+        emit errorOccurred(QString::fromUtf8("数据通道连接失败 (%1:%2): %3")
+                           .arg(ip).arg(dataPort).arg(err));
         return false;
     }
 
@@ -248,17 +264,27 @@ bool CTSPA22SDriver::connectDevice(ConnectionMode mode)
 
 void CTSPA22SDriver::disconnectDevice()
 {
-    m_monitorTimer->stop();
-    stopAcquisition();
+    // 停止采集（仅尝试发送 stop 命令，不等响应）
+    if (m_acquiring) {
+        QJsonObject cmd;
+        cmd["scan"] = 0;
+        sendJsonCommand(cmd, false);
+        m_acquiring = false;
+    }
 
+    m_monitorTimer->stop();
+
+    // abort() 立即关闭底层 socket，不等缓冲区刷新
     if (m_dataSocket->state() != QAbstractSocket::UnconnectedState)
-        m_dataSocket->disconnectFromHost();
+        m_dataSocket->abort();
     if (m_cmdSocket->state() != QAbstractSocket::UnconnectedState)
-        m_cmdSocket->disconnectFromHost();
+        m_cmdSocket->abort();
 
     m_cmdReady  = false;
     m_dataReady = false;
     m_connected = false;
+    m_acquiring = false;
+    m_hasLastWaveFrame = false;
 
     emit connectionChanged(false);
     emit statusChanged(QString::fromUtf8("已断开"));
@@ -330,11 +356,11 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
     if (frame.type == "Ts22w") {
         // === 常规 PA 扫描 ===
-        DataPacket pkt = MTLDParser::parseWaveforms(frame.payload);
+        auto pkt = std::make_shared<DataPacket>(MTLDParser::parseWaveforms(frame.payload));
 
-        if (pkt.beamCount < 1) return;
+        if (pkt->beamCount < 1) return;
 
-        const quint16 currentFrame = pkt.beams[0].frame;
+        const quint16 currentFrame = pkt->beams[0].frame;
         int frameDiff = 0;
         if (m_hasLastWaveFrame) {
             frameDiff = static_cast<quint16>(currentFrame - m_lastWaveFrame);
@@ -354,8 +380,8 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
         // --- A 扫描：发送当前声束波形 ---
         {
-            int curBeam = qBound(0, m_beamCount / 2, pkt.beamCount - 1);
-            const auto &wf = pkt.beams[curBeam];
+            int curBeam = qBound(0, m_beamCount / 2, pkt->beamCount - 1);
+            const auto &wf = pkt->beams[curBeam];
             QVector<double> wave(WaveSampleCount);
 
             // 按检波模式归一化：
@@ -373,15 +399,15 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
         // --- 全部声束波形（供 B 扫 softwareImaging 使用） ---
         {
-            QVector<QVector<double>> allWaves(pkt.beamCount);
+            QVector<QVector<double>> allWaves(pkt->beamCount);
             const bool isRF = (m_rectify == 3);
-            for (int b = 0; b < pkt.beamCount; ++b) {
+            for (int b = 0; b < pkt->beamCount; ++b) {
                 allWaves[b].resize(WaveSampleCount);
                 for (int i = 0; i < WaveSampleCount; ++i) {
                     if (isRF)
-                        allWaves[b][i] = (static_cast<int>(pkt.beams[b].waveP[i]) - 128) / 128.0;
+                        allWaves[b][i] = (static_cast<int>(pkt->beams[b].waveP[i]) - 128) / 128.0;
                     else
-                        allWaves[b][i] = pkt.beams[b].waveP[i] / 255.0;
+                        allWaves[b][i] = pkt->beams[b].waveP[i] / 255.0;
                 }
             }
             emit multiBeamWaveformsReady(allWaves);
@@ -389,8 +415,8 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
         // --- 闸门读数 ---
         {
-            int curBeam = qBound(0, m_beamCount / 2, pkt.beamCount - 1);
-            const auto &wf = pkt.beams[curBeam];
+            int curBeam = qBound(0, m_beamCount / 2, pkt->beamCount - 1);
+            const auto &wf = pkt->beams[curBeam];
             emit gateReadingsReady('A', wf.amp0, wf.path0);
             emit gateReadingsReady('B', wf.amp1, wf.path1);
             emit gateReadingsReady('C', wf.amp2, wf.path2);
@@ -398,8 +424,8 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
         // --- 编码器 ---
         {
-            int curBeam = qBound(0, m_beamCount / 2, pkt.beamCount - 1);
-            const auto &wf = pkt.beams[curBeam];
+            int curBeam = qBound(0, m_beamCount / 2, pkt->beamCount - 1);
+            const auto &wf = pkt->beams[curBeam];
             // 正向为主，同时考虑反向
             int pos = static_cast<int>(wf.encFwd) - static_cast<int>(wf.encRvs);
             emit encoderPositionChanged(pos);
@@ -432,16 +458,38 @@ void CTSPA22SDriver::onCmdDisconnected()
 {
     m_cmdReady = false;
     if (m_connected) {
+        // 命令通道断开意味着整个连接不可用，做完整清理
         m_connected = false;
+        m_acquiring = false;
+        m_monitorTimer->stop();
+        m_dataSocket->abort();
+        m_dataReady = false;
         emit connectionChanged(false);
-        emit statusChanged(QString::fromUtf8("命令通道断开"));
+        emit statusChanged(QString::fromUtf8("命令通道断开，连接已断开"));
     }
 }
 
 void CTSPA22SDriver::onCmdError(QAbstractSocket::SocketError err)
 {
-    Q_UNUSED(err);
-    emit errorOccurred(QString::fromUtf8("命令通道错误: ") + m_cmdSocket->errorString());
+    const QString errStr = m_cmdSocket->errorString();
+    // 严重错误：连接被拒绝 / 远端关闭 / 网络不可达 — 自动断开
+    switch (err) {
+    case QAbstractSocket::ConnectionRefusedError:
+    case QAbstractSocket::RemoteHostClosedError:
+    case QAbstractSocket::NetworkError:
+    case QAbstractSocket::SocketTimeoutError:
+        if (m_connected || m_cmdReady) {
+            m_cmdReady = false;
+            m_connected = false;
+            m_acquiring = false;
+            m_monitorTimer->stop();
+            emit connectionChanged(false);
+        }
+        break;
+    default:
+        break;
+    }
+    emit errorOccurred(QString::fromUtf8("命令通道错误: %1").arg(errStr));
 }
 
 void CTSPA22SDriver::onDataConnected()
@@ -458,16 +506,38 @@ void CTSPA22SDriver::onDataDisconnected()
 {
     m_dataReady = false;
     if (m_connected) {
+        // 数据通道断开意味着无法接收波形，做完整清理
         m_connected = false;
+        m_acquiring = false;
+        m_monitorTimer->stop();
+        m_hasLastWaveFrame = false;
         emit connectionChanged(false);
-        emit statusChanged(QString::fromUtf8("数据通道断开"));
+        emit statusChanged(QString::fromUtf8("数据通道断开，连接已断开"));
     }
 }
 
 void CTSPA22SDriver::onDataError(QAbstractSocket::SocketError err)
 {
-    Q_UNUSED(err);
-    emit errorOccurred(QString::fromUtf8("数据通道错误: ") + m_dataSocket->errorString());
+    const QString errStr = m_dataSocket->errorString();
+    // 严重错误：自动断开
+    switch (err) {
+    case QAbstractSocket::ConnectionRefusedError:
+    case QAbstractSocket::RemoteHostClosedError:
+    case QAbstractSocket::NetworkError:
+    case QAbstractSocket::SocketTimeoutError:
+        if (m_connected || m_dataReady) {
+            m_dataReady = false;
+            m_connected = false;
+            m_acquiring = false;
+            m_monitorTimer->stop();
+            m_hasLastWaveFrame = false;
+            emit connectionChanged(false);
+        }
+        break;
+    default:
+        break;
+    }
+    emit errorOccurred(QString::fromUtf8("数据通道错误: %1").arg(errStr));
 }
 
 // ================================================================
@@ -476,7 +546,10 @@ void CTSPA22SDriver::onDataError(QAbstractSocket::SocketError err)
 
 QJsonObject CTSPA22SDriver::sendJsonCommand(const QJsonObject &obj, bool waitForResp)
 {
-    if (!m_cmdReady) return {};
+    if (!m_cmdReady || m_cmdSocket->state() != QAbstractSocket::ConnectedState) {
+        emit errorOccurred(QString::fromUtf8("命令通道未就绪，无法发送命令"));
+        return {};
+    }
 
     // 发前清空命令通道残留（防止读到上一次的响应）
     if (m_cmdSocket->bytesAvailable() > 0)
@@ -486,7 +559,12 @@ QJsonObject CTSPA22SDriver::sendJsonCommand(const QJsonObject &obj, bool waitFor
     QByteArray json = doc.toJson(QJsonDocument::Compact);
     json.append('\x1E');  // MTLD 命令结束符 (RS, 同 MFC 版 \36 八进制)
 
-    m_cmdSocket->write(json);
+    const qint64 written = m_cmdSocket->write(json);
+    if (written != json.size()) {
+        emit errorOccurred(QString::fromUtf8("命令发送失败: write 返回 %1 (预期 %2)")
+                           .arg(written).arg(json.size()));
+        return {};
+    }
     m_cmdSocket->flush();
 
     if (waitForResp)
@@ -496,8 +574,20 @@ QJsonObject CTSPA22SDriver::sendJsonCommand(const QJsonObject &obj, bool waitFor
 
 QJsonObject CTSPA22SDriver::waitForResponse(int timeoutMs)
 {
-    if (!m_cmdSocket->waitForReadyRead(timeoutMs))
+    // 连接已断开则直接返回
+    if (m_cmdSocket->state() != QAbstractSocket::ConnectedState) {
+        emit errorOccurred(QString::fromUtf8("等待响应时命令通道已断开"));
         return {};
+    }
+
+    if (!m_cmdSocket->waitForReadyRead(timeoutMs)) {
+        // 区分超时和连接错误
+        if (m_cmdSocket->state() != QAbstractSocket::ConnectedState)
+            emit errorOccurred(QString::fromUtf8("等待响应时连接断开: ") + m_cmdSocket->errorString());
+        else
+            emit errorOccurred(QString::fromUtf8("命令响应超时 (%1ms)").arg(timeoutMs));
+        return {};
+    }
 
     QByteArray respData = m_cmdSocket->readAll();
     // 去除结束符 RS(0x1E)
@@ -506,8 +596,12 @@ QJsonObject CTSPA22SDriver::waitForResponse(int timeoutMs)
 
     QJsonParseError err;
     QJsonDocument doc = QJsonDocument::fromJson(respData, &err);
-    if (err.error != QJsonParseError::NoError)
+    if (err.error != QJsonParseError::NoError) {
+        emit errorOccurred(QString::fromUtf8("命令响应JSON解析失败: %1 (原始: %2)")
+                           .arg(err.errorString())
+                           .arg(QString::fromUtf8(respData.left(200))));
         return {};
+    }
 
     return doc.object();
 }
@@ -867,9 +961,9 @@ void CTSPA22SDriver::setACG(bool enabled, const PAParams &params)
         obj["bcg"] = 1.0;
     } else {
         QJsonArray values;
-        const int count = qBound(1, params.beamCount, MaxBeams);
+        const int count = qBound(1, params.global.beamCount, MaxBeams);
         for (int beam = 0; beam < count; ++beam)
-            values.append(double(params.acgValue[beam]));
+            values.append(double(params.tcg.acgValue[beam]));
         obj["bcg"] = values;
     }
     sendJsonCommand(obj);
@@ -877,26 +971,26 @@ void CTSPA22SDriver::setACG(bool enabled, const PAParams &params)
 
 void CTSPA22SDriver::setTCG(bool enabled, const PAParams &params)
 {
-    const int count = qBound(1, params.beamCount, MaxBeams);
+    const int count = qBound(1, params.global.beamCount, MaxBeams);
     for (int beam = 0; beam < count; ++beam) {
         QJsonArray data;
         if (enabled) {
             for (int i = 0; i < 50; ++i) {
                 const int segment = i / 10;
                 const double fraction = (i % 10) / 10.0;
-                const double distance = params.tcgX[segment]
-                    + (params.tcgX[segment + 1] - params.tcgX[segment]) * fraction;
-                const int x = qRound(distance * 2.0 / params.lVelocity
+                const double distance = params.tcg.tcgX[segment]
+                    + (params.tcg.tcgX[segment + 1] - params.tcg.tcgX[segment]) * fraction;
+                const int x = qRound(distance * 2.0 / params.wp.lVelocity
                                      * 1000000.0 / S22_SP);
-                const double ratio = params.tcgRatio[segment]
-                    + (params.tcgRatio[segment + 1] - params.tcgRatio[segment]) * fraction;
+                const double ratio = params.tcg.tcgRatio[segment]
+                    + (params.tcg.tcgRatio[segment + 1] - params.tcg.tcgRatio[segment]) * fraction;
                 QJsonArray point; point.append(x); point.append(ratio);
                 data.append(point);
             }
         } else {
             for (int i = 0; i < 10; ++i) {
-                const int x = qRound(i * 40.0 * params.range / WaveSampleCount * 2.0
-                                     / params.lVelocity * 1000000.0 / S22_SP);
+                const int x = qRound(i * 40.0 * params.tx.range / WaveSampleCount * 2.0
+                                     / params.wp.lVelocity * 1000000.0 / S22_SP);
                 QJsonArray point; point.append(x); point.append(1.0);
                 data.append(point);
             }

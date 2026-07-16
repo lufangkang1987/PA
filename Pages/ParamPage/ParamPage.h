@@ -24,7 +24,7 @@ public:
     /// 获取闸门参数（供外部读取后更新 AScanWidget 闸门显示）
     void getGateParams(int gate, bool &enabled, float &start, float &width,
                        float &threshold) const;
-    int  activeGate() const { return m_params.gateSelect; }
+    int  activeGate() const { return m_params.gate.gateSelect; }
     const PAParams &params() const { return m_params; }
     void setBeamNo(int beam);
     void setAnalysisRect(int line1, int line2, int column1, int column2);

@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 #include <QObject>
 #include <QVector>
+#include <memory>
 
 class CScanEngine : public QObject
 {
@@ -28,7 +29,7 @@ public:
     QVector<ScanRule> currentScanRules(int beamCount);
 
 public slots:
-    void processPacket(const DataPacket &packet);
+    void processPacket(std::shared_ptr<DataPacket> packet);
 
 signals:
     void imageUpdated(const QVector<float> &image, int width, int height);

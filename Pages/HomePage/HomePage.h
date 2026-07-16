@@ -63,6 +63,7 @@ class HomePage : public QWidget
 public:
 	explicit HomePage(QWidget* parent = nullptr);
 	void setDriver(IDriver* driver);
+	void bindParams(const PAParams *params);
 
 	// 闸门可视化
 	void setGateParams(int gate, bool enabled, float start, float width,

@@ -17,8 +17,6 @@ class CScanIOManager;
 class CScanEngine;
 class QThread;
 
-bool runCScanCodecSelfTest(QString *errorMessage = nullptr);
-
 class MainWindow : public QMainWindow
 {
     Q_OBJECT

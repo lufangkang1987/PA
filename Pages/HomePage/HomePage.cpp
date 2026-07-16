@@ -289,6 +289,12 @@ void HomePage::setDriver(IDriver* driver)
 	}
 }
 
+void HomePage::bindParams(const PAParams *params)
+{
+	if (m_bScan)
+		m_bScan->setParamsSource(params);
+}
+
 void HomePage::setGateParams(int gate, bool enabled, float start, float width,
                              float threshold, const QColor &color)
 {

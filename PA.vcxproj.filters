@@ -50,6 +50,69 @@
     <ClCompile Include="Pages\ParamPage\ParamPage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Pages\ParamPage\TransmitParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ReceiveParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\GateParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ProbeParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\WedgeParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\WorkpieceParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ScanParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\TcgParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ImagingParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\EncoderParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\AnalysisParamPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.Model.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.CScanPages.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.CalibrationPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.ScanPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.WorkpiecePage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.WedgePage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.ProbePage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.GatePage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.ReceivePage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.TransmitPage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -77,6 +140,42 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\ParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <ClInclude Include="Pages\ParamPage\ParamPageUiHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <QtMoc Include="Pages\ParamPage\TransmitParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\ReceiveParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\GateParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\ProbeParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\WedgeParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\WorkpieceParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\ScanParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\TcgParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\ImagingParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\EncoderParamPage.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="Pages\ParamPage\AnalysisParamPage.h">
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="Pages\MeasurePage\MeasurePage.h">

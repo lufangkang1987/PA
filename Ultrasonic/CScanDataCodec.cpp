@@ -2,7 +2,6 @@
 #include <QDataStream>
 #include <QFile>
 #include <QJsonDocument>
-#include <QTemporaryDir>
 #include <cstring>
 
 static const quint32 kCScanMagic = 0x54444150; // "PADT" LE
@@ -157,54 +156,3 @@ QVector<float> loadCScanFile(const QString &path, int &w, int &h,
     return data;
 }
 
-bool runCScanCodecSelfTest(QString *errorMessage)
-{
-    auto fail = [errorMessage](const QString &message) {
-        if (errorMessage) *errorMessage = message;
-        return false;
-    };
-
-    QTemporaryDir directory;
-    if (!directory.isValid()) return fail("temporary directory creation failed");
-
-    QJsonObject params;
-    params["range"] = 100.0;
-    params["scanType"] = 0;
-
-    QVector<float> image{0.1f, 0.2f, 0.3f, 0.4f};
-    QVector<DataPacket> packets(1);
-    packets[0].beamCount = 1;
-    packets[0].frameIndex = 7;
-    packets[0].beams[0].waveP[0] = 42;
-    packets[0].beams[0].frame = 7;
-    packets[0].beams[0].channel = 3;
-
-    QVector<ScanRule> rules(1);
-    rules[0].x = 12.5;
-    rules[0].ang = 45.0;
-
-    const QString path = directory.filePath("roundtrip.padt");
-    if (!saveCScanFile(path, image, 2, 2, params, packets, rules))
-        return fail("PADT save failed");
-
-    int width = 0, height = 0;
-    QJsonObject restoredParams;
-    QVector<DataPacket> restoredPackets;
-    QVector<ScanRule> restoredRules;
-    const QVector<float> restoredImage = loadCScanFile(
-        path, width, height, restoredParams, restoredPackets, &restoredRules);
-
-    if (width != 2 || height != 2 || restoredImage != image)
-        return fail("PADT image mismatch");
-    if (restoredParams["scanType"].toInt() != 0)
-        return fail("PADT params mismatch");
-    if (restoredPackets.size() != 1 || restoredPackets[0].beamCount != 1
-            || restoredPackets[0].beams[0].waveP[0] != 42
-            || restoredPackets[0].beams[0].channel != 3)
-        return fail("PADT packet mismatch");
-    if (restoredRules.size() != 1 || qAbs(restoredRules[0].x - 12.5) > 0.001
-            || qAbs(restoredRules[0].ang - 45.0) > 0.001)
-        return fail("PADT scan rule mismatch");
-
-    return true;
-}

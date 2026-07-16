@@ -99,6 +99,27 @@
     <ClCompile Include="MainWindow\MainWindow.cpp" />
     <ClCompile Include="Pages\HomePage\HomePage.cpp" />
     <ClCompile Include="Pages\ParamPage\ParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\TransmitParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ReceiveParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\GateParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ProbeParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\WedgeParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\WorkpieceParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ScanParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\TcgParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ImagingParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\EncoderParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\AnalysisParamPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.Model.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.CScanPages.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.CalibrationPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.ScanPage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.WorkpiecePage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.WedgePage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.ProbePage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.GatePage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.ReceivePage.cpp" />
+    <ClCompile Include="Pages\ParamPage\ParamPage.TransmitPage.cpp" />
     <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp" />
 
     <ClCompile Include="Ultrasonic\CalibrationController.cpp" />
@@ -129,6 +150,18 @@
   <ItemGroup>
     <QtMoc Include="MainWindow\MainWindow.h" />
     <QtMoc Include="Pages\ParamPage\ParamPage.h" />
+    <ClInclude Include="Pages\ParamPage\ParamPageUiHelpers.h" />
+    <QtMoc Include="Pages\ParamPage\TransmitParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\ReceiveParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\GateParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\ProbeParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\WedgeParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\WorkpieceParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\ScanParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\TcgParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\ImagingParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\EncoderParamPage.h" />
+    <QtMoc Include="Pages\ParamPage\AnalysisParamPage.h" />
     <QtMoc Include="Pages\MeasurePage\MeasurePage.h" />
     <QtMoc Include="Pages\HomePage\HomePage.h" />
     <ClInclude Include="Ultrasonic\DataTypes.h" />

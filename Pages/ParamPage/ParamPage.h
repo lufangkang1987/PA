@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <QFrame>
 #include <QJsonObject>
 #include "PAParams.h"
@@ -11,6 +11,17 @@ class QSpinBox;
 class QLabel;
 class QPushButton;
 class ParameterDispatcher;
+class TransmitParamPage;
+class ReceiveParamPage;
+class GateParamPage;
+class ProbeParamPage;
+class WedgeParamPage;
+class WorkpieceParamPage;
+class ScanParamPage;
+class TcgParamPage;
+class ImagingParamPage;
+class EncoderParamPage;
+class AnalysisParamPage;
 
 class ParamPage : public QFrame
 {
@@ -101,6 +112,17 @@ signals:
 private:
     QListWidget   *m_nav      = nullptr;
     QStackedWidget *m_stack   = nullptr;
+    TransmitParamPage *m_transmitPage = nullptr;
+    ReceiveParamPage  *m_receivePage = nullptr;
+    GateParamPage     *m_gatePage = nullptr;
+    ProbeParamPage    *m_probePage = nullptr;
+    WedgeParamPage    *m_wedgePage = nullptr;
+    WorkpieceParamPage *m_workpiecePage = nullptr;
+    ScanParamPage     *m_scanPage = nullptr;
+    TcgParamPage      *m_tcgPage = nullptr;
+    ImagingParamPage  *m_imagingPage = nullptr;
+    EncoderParamPage  *m_encoderPage = nullptr;
+    AnalysisParamPage *m_analysisPage = nullptr;
 
     // 闸门页控件
     QComboBox      *m_gateSelCombo    = nullptr;

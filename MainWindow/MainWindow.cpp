@@ -205,6 +205,7 @@ void MainWindow::buildDriverAndEngine()
     connect(m_ioManager, &CScanIOManager::statusMessage, this,
             [this](const QString &msg) { statusBar()->showMessage(msg); });
     const bool paramsLoaded = m_paramPage->initializeParams();
+    m_homePage->bindParams(&m_paramPage->params());
     m_homePage->configureCScanView(m_paramPage->params());
     if (!paramsLoaded)
         statusBar()->showMessage(QString::fromUtf8("默认参数文件加载失败，已使用程序内置参数"));

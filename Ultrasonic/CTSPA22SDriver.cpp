@@ -1055,9 +1055,11 @@ void CTSPA22SDriver::queryTemperature()
     obj["get_xadc"] = "temp";
 
     QJsonObject resp = sendJsonCommand(obj, true);  // 需要温度响应
-    if (resp.contains("result") && resp["result"].toObject().contains("temp")) {
-        const double temp = qBound(-50.0,
-            resp["result"].toObject()["temp"].toDouble(), 100.0);
+    // 设备返回 {"result":48.83}（数值直接在 result 上，
+    // 见 MFC CTSPA22SView.cpp:4643 注释 R:{"result":12.19...}）
+    const QJsonValue result = resp.value("result");
+    if (result.isDouble()) {
+        const double temp = qBound(-50.0, result.toDouble(), 100.0);
         emit temperatureReceived(temp);
         m_xadcTemp = static_cast<int>(temp);
         if (m_tempCorrect
@@ -1074,10 +1076,10 @@ void CTSPA22SDriver::queryVoltage()
     obj["get_xadc"] = "vin";
 
     QJsonObject resp = sendJsonCommand(obj, true);  // 需要电压响应
-    if (resp.contains("result") && resp["result"].toObject().contains("vin")) {
-        double vin = resp["result"].toObject()["vin"].toDouble();
-        emit voltageReceived(vin);
-    }
+    // 同温度查询：设备返回 {"result":11.19}，数值直接在 result 上
+    const QJsonValue result = resp.value("result");
+    if (result.isDouble())
+        emit voltageReceived(result.toDouble());
 }
 
 void CTSPA22SDriver::resetEncoder(int idx)

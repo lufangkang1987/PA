@@ -3,10 +3,8 @@
 #include "DataTypes.h"
 #include <memory>
 
-class QComboBox;
-class QLabel;
-class QPushButton;
 class QVBoxLayout;
+class QThread;
 class HomePage;
 class ParamPage;
 class MeasurePage;
@@ -15,7 +13,11 @@ class CalibrationController;
 class ConnectionManager;
 class CScanIOManager;
 class CScanEngine;
-class QThread;
+class DataPacketProcessor;
+class HeaderBar;
+
+/// 应用工作模式——确保扫描/校准/回放互斥
+enum class AppMode { Idle, Scanning, Calibrating, Replaying };
 
 class MainWindow : public QMainWindow
 {
@@ -29,7 +31,7 @@ protected:
 
 private:
     void setupUi();
-    void buildHeader(QWidget *shell, QVBoxLayout *root);
+    void buildHeader(QVBoxLayout *root);
     void buildCentral(QVBoxLayout *root);
     void buildDriverAndEngine();
     void wirePageSignals();
@@ -38,7 +40,10 @@ private:
     void applyGlobalStyleSheet();
     void wireDriverSignals();
     bool loadParamsFile(const QString &path);
-    void updatePcBattery();
+    bool enterMode(AppMode mode);
+    void leaveMode(AppMode mode);
+
+    AppMode m_appMode = AppMode::Idle;
 
     HomePage     *m_homePage = nullptr;
     ParamPage    *m_paramPage = nullptr;
@@ -46,21 +51,11 @@ private:
     IDriver      *m_driver = nullptr;
     CScanEngine  *m_cScanEngine = nullptr;
     QThread      *m_cScanThread = nullptr;
-    std::shared_ptr<DataPacket> m_latestPacket;
-    QVector<double> m_scanRulePositions;
-    bool          m_hasLatestPacket = false;
 
     CalibrationController *m_calController = nullptr;
     ConnectionManager     *m_connManager = nullptr;
     CScanIOManager        *m_ioManager = nullptr;
+    DataPacketProcessor   *m_dataProcessor = nullptr;
 
-    // 顶部栏控件（UI 属 MainWindow，信号委托给 ConnectionManager）
-    QComboBox *m_modeCombo = nullptr;
-    QLabel    *m_deviceLabel = nullptr;
-    QLabel    *m_ipLabel = nullptr;
-
-    // 遥测标签
-    QLabel *m_temperatureLabel = nullptr;
-    QLabel *m_pcBatteryLabel = nullptr;
-    QLabel *m_paBatteryLabel = nullptr;
+    HeaderBar *m_headerBar = nullptr;
 };

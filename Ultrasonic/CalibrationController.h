@@ -5,42 +5,47 @@
 #include <QObject>
 
 class CScanEngine;
-class HomePage;
 class IDriver;
-class ParamPage;
 
-/// 校准状态机 — 从 MainWindow 分离的纯业务逻辑
+/// 校准状态机 — 纯业务逻辑，通过信号与 UI 通信
+///
+/// 依赖：IDriver + CScanEngine（同层）+ PAParams（数据层）
+/// 不依赖任何 Pages/ 或 Widgets/ 层
 class CalibrationController : public QObject
 {
     Q_OBJECT
 public:
-    CalibrationController(IDriver *driver, ParamPage *paramPage,
-                          CScanEngine *cScanEngine, HomePage *homePage,
+    CalibrationController(IDriver *driver, CScanEngine *cScanEngine,
                           QObject *parent = nullptr);
 
     bool isCalibrating() const { return m_calibrating; }
     bool isEncoderCalibrating() const { return m_encoderCalibrating; }
 
-    /// 存储最新数据包（shared_ptr，避免拷贝 53KB）
+    void setParams(const PAParams *params) { m_params = params; }
     void setLatestPacket(std::shared_ptr<DataPacket> pkt) { m_latestPacket = pkt; }
+    void setCalibrationTargetPercent(int pct) { m_calibrationTargetPercent = pct; }
 
 public slots:
     void onCalibrationRequested(int item);
     void onEncoderCalibrationRequested();
-
-    /// 接收回放状态（替代 AppState::replayState）
     void setReplayActive(bool active) { m_replayActive = active; }
-    /// 接收编码器位置（替代 AppState::encoderCount）
     void setEncoderPosition(int pos) { m_encoderPosition = pos; }
 
 signals:
     void statusMessage(const QString &msg);
 
+    // 校准结果 → UI 层（MainWindow 连接）
+    void calibrationGuideChanged(bool visible, int targetPercent);
+    void beamSelectRequested(int beam);
+    void velocityCalibrated(int velocityMps);
+    void probeDelayCalibrated(float delayUs);
+    void acgCalibrated(const QVector<float> &values);
+    void coderDegCalibrated(float mmPerPulse);
+
 private:
-    IDriver      *m_driver;
-    ParamPage    *m_paramPage;
-    CScanEngine  *m_cScanEngine;
-    HomePage     *m_homePage;
+    IDriver      *m_driver = nullptr;
+    CScanEngine  *m_cScanEngine = nullptr;
+    const PAParams *m_params = nullptr;
 
     std::shared_ptr<DataPacket> m_latestPacket;
     bool m_calibrating = false;

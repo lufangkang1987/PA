@@ -1,9 +1,11 @@
 #include "AScanWidget.h"
-#include <QPainter>
+#include "DataTypes.h"
 #include "Theme.h"
+
 #include <QPainterPath>
 #include <QMouseEvent>
 #include <QtMath>
+#include <QPainter>
 
 AScanWidget::AScanWidget(QWidget *parent) : QWidget(parent)
 {
@@ -274,7 +276,7 @@ void AScanWidget::mousePressEvent(QMouseEvent *ev)
     if (ev->button() == Qt::LeftButton && plot.contains(ev->position())) {
         // Ctrl+点击 → 切换声束
         if (ev->modifiers() & Qt::ControlModifier) {
-            const int beamCount = 128;
+            const int beamCount = MaxBeams;
             const int beam = int((ev->position().y() - plot.top()) / plot.height() * beamCount);
             emit beamChangeRequested(qBound(0, beam, beamCount - 1));
         } else {

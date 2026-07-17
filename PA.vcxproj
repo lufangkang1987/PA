@@ -97,6 +97,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="MainWindow\MainWindow.cpp" />
+    <ClCompile Include="MainWindow\HeaderBar.cpp" />
     <ClCompile Include="Pages\HomePage\HomePage.cpp" />
     <ClCompile Include="Pages\ParamPage\ParamPage.cpp" />
     <ClCompile Include="Pages\ParamPage\TransmitParamPage.cpp" />
@@ -123,6 +124,7 @@
     <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp" />
 
     <ClCompile Include="Ultrasonic\CalibrationController.cpp" />
+    <ClCompile Include="Ultrasonic\DataPacketProcessor.cpp" />
     <ClCompile Include="Ultrasonic\ConnectionManager.cpp" />
     <ClCompile Include="Ultrasonic\CScanIOManager.cpp" />
     <ClCompile Include="Ultrasonic\ParameterDispatcher.cpp" />
@@ -149,6 +151,7 @@
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="MainWindow\MainWindow.h" />
+    <QtMoc Include="MainWindow\HeaderBar.h" />
     <QtMoc Include="Pages\ParamPage\ParamPage.h" />
     <ClInclude Include="Pages\ParamPage\ParamPageUiHelpers.h" />
     <QtMoc Include="Pages\ParamPage\TransmitParamPage.h" />
@@ -166,6 +169,7 @@
     <QtMoc Include="Pages\HomePage\HomePage.h" />
     <ClInclude Include="Ultrasonic\DataTypes.h" />
     <QtMoc Include="Ultrasonic\CalibrationController.h" />
+    <QtMoc Include="Ultrasonic\DataPacketProcessor.h" />
     <QtMoc Include="Ultrasonic\ConnectionManager.h" />
     <QtMoc Include="Ultrasonic\CScanIOManager.h" />
     <QtMoc Include="Ultrasonic\ParameterDispatcher.h" />

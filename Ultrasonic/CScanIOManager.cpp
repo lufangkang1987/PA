@@ -1,16 +1,12 @@
 #include "CScanIOManager.h"
-#include "CalibrationController.h"
 #include "CScanDataCodec.h"
 #include "CScanEngine.h"
-#include "HomePage.h"
-#include "ParamPage.h"
+#include "PAParams.h"
 #include <QJsonObject>
 #include <QString>
 
-CScanIOManager::CScanIOManager(HomePage *homePage, ParamPage *paramPage,
-        CScanEngine *cScanEngine, CalibrationController *calController, QObject *parent)
-    : QObject(parent), m_homePage(homePage), m_paramPage(paramPage),
-      m_cScanEngine(cScanEngine), m_calController(calController)
+CScanIOManager::CScanIOManager(CScanEngine *cScanEngine, QObject *parent)
+    : QObject(parent), m_cScanEngine(cScanEngine)
 {
 }
 
@@ -22,31 +18,17 @@ void CScanIOManager::setReplayActive(bool active)
     }
 }
 
-void CScanIOManager::onSaveDataRequested(const QString &path)
+bool CScanIOManager::saveToFile(const QString &path, const QVector<float> &data,
+                                 int w, int h, const QJsonObject &params,
+                                 const QVector<DataPacket> &packets) const
 {
-    if (!m_homePage || !m_paramPage) return;
-    int w = 0, h = 0;
-    QVector<float> data = m_homePage->getCScanData(w, h);
-    if (data.isEmpty() || w <= 0 || h <= 0) {
-        emit statusMessage("无C扫数据可保存");
-        return;
-    }
-    QJsonObject paramsJson = m_paramPage->serializeParams();
-    if (saveCScanFile(path, data, w, h, paramsJson,
-                      m_cScanEngine->archivedPackets())) {
-        emit statusMessage(QString("C扫数据已保存: %1 (%2×%3)")
-            .arg(path).arg(w).arg(h));
-    } else {
-        emit statusMessage("保存C扫数据失败");
-    }
+    return ::saveCScanFile(path, data, w, h, params, packets);
 }
 
 void CScanIOManager::onReplayDataRequested(const QString &path)
 {
-    if (!m_homePage || !m_paramPage) return;
-    if (m_calController->isCalibrating() || m_calController->isEncoderCalibrating()
-            || m_cScanEngine->isScanning()) {
-        emit statusMessage("扫查或校准期间不能进入回放");
+    if (m_cScanEngine->isScanning()) {
+        emit statusMessage("扫查期间不能进入回放");
         return;
     }
     int w = 0, h = 0;
@@ -58,51 +40,49 @@ void CScanIOManager::onReplayDataRequested(const QString &path)
         emit statusMessage("加载C扫数据失败");
         return;
     }
-    m_homePage->setCScanReplayData(data, w, h, true);
     m_cScanEngine->setArchivedPackets(packets);
-    if (!loadedRules.isEmpty()) m_cScanEngine->setScanRules(loadedRules);
+    if (!loadedRules.isEmpty())
+        m_cScanEngine->setScanRules(loadedRules);
     setReplayActive(true);
     m_replayCurPos = 0;
-    m_paramPage->deserializeParams(paramsJson);
-    m_paramPage->syncUiFromParams();
-    m_homePage->configureCScanView(m_paramPage->params());
+    m_cScanPageStart = 0;
+    emit replayDataReady(data, w, h, paramsJson, packets, loadedRules);
     emit statusMessage(QString("C扫回放: %1 (%2×%3)").arg(path).arg(w).arg(h));
 }
 
 void CScanIOManager::onCScanPositionSelected(int line, int)
 {
-    const auto &packets = m_cScanEngine->archivedPackets();
-    if (line < 0 || line >= packets.size()) return;
+    auto packets = m_cScanEngine->archivedPackets();
+    if (!packets || line < 0 || line >= packets->size()) return;
     m_replayCurPos = line;
-    m_homePage->showReplayPacket(packets[line], line,
-        m_paramPage->params().rx.curBeam, m_paramPage->params().rx.rectify);
-}
-
-void CScanIOManager::onCScanViewParamsChanged()
-{
-    m_homePage->configureCScanView(m_paramPage->params());
+    emit replayPacketRequested((*packets)[line], line,
+                               m_params->rx.curBeam, m_params->rx.rectify);
 }
 
 void CScanIOManager::onCScanPageRequested()
 {
-    const int count = m_cScanEngine->archivedPackets().size();
+    auto packets = m_cScanEngine->archivedPackets();
+    if (!packets) return;
+    const int count = packets->size();
     if (count <= 0) return;
     const int maximumStart = qMax(0, count - CScanLinesPerPage);
-    int pageStart = m_homePage->cScanPageStart() + CScanLinesPerPage;
-    if (pageStart > maximumStart) pageStart = 0;
-    m_homePage->setCScanPageStart(pageStart);
-    const int line = qBound(0, pageStart + m_paramPage->params().ana.anaLineX1, count - 1);
+    int ps = m_cScanPageStart + CScanLinesPerPage;
+    if (ps > maximumStart) ps = 0;
+    const int line = qBound(0, ps + m_params->ana.anaLineX1, count - 1);
     m_replayCurPos = line;
-    m_homePage->showReplayPacket(m_cScanEngine->archivedPackets()[line], line,
-        m_paramPage->params().rx.curBeam, m_paramPage->params().rx.rectify);
+    m_cScanPageStart = ps;
+    emit replayUISetPageStart(ps);
+    emit replayPacketRequested((*packets)[line], line,
+                               m_params->rx.curBeam, m_params->rx.rectify);
 }
 
 void CScanIOManager::onExitReplayRequested()
 {
     setReplayActive(false);
     m_replayCurPos = 0;
-    m_homePage->setCScanReplayMode(false);
-    m_homePage->setCScanPageStart(0);
-    m_homePage->selectCScanLine(-1);
+    m_cScanPageStart = 0;
+    emit replayUISetMode(false);
+    emit replayUISetPageStart(0);
+    emit replayUISelectLine(-1);
     emit statusMessage("已退出 C 扫回放");
 }

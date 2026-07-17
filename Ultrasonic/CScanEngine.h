@@ -19,10 +19,9 @@ public:
 
     bool isScanning() const;
     int capturedLines() const;
-    float imgSpanStart() const { return m_imgSpanStart; }
-    float imgSpanEnd()   const { return m_imgSpanEnd; }
     QVector<float> image() const;
-    QVector<DataPacket> archivedPackets() const;
+    // 线程安全的存档访问：返回 shared_ptr 快照（引擎 stop 时创建），零拷贝
+    std::shared_ptr<const QVector<DataPacket>> archivedPackets() const;
     void setArchivedPackets(const QVector<DataPacket> &packets);
     void setRulePositions(const QVector<double> &positions);
     void setScanRules(const QVector<ScanRule> &rules);
@@ -32,7 +31,8 @@ public slots:
     void processPacket(std::shared_ptr<DataPacket> packet);
 
 signals:
-    void imageUpdated(const QVector<float> &image, int width, int height);
+    void imageUpdated(const QVector<float> &image, int width, int height,
+                      float spanStart, float spanEnd);
     void progressChanged(int capturedLines, int totalLines);
     void metricsChanged(int capturedLines, int totalLines, double scannedMm,
                         double speedMmPerSec, double averageMmPerSec);
@@ -54,7 +54,8 @@ private:
     bool m_scanning = false;
     int m_capturedLines = 0;
     int m_lastLine = -1;
-    QVector<DataPacket> m_archivedPackets;
+    QVector<std::shared_ptr<const DataPacket>> m_archivedPackets;
+    std::shared_ptr<const QVector<DataPacket>> m_archivedSnapshot;
     QElapsedTimer m_scanTimer;
     qint64 m_lastMetricMs = 0;
     qint64 m_lastImageMs = 0;

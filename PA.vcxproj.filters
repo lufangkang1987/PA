@@ -1,202 +1,267 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>qml;cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
-    </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>qrc;rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
-    <Filter Include="Form Files">
-      <UniqueIdentifier>{99349809-55BA-4b9d-BF79-8FDBB0286EB3}</UniqueIdentifier>
-      <Extensions>ui</Extensions>
-    </Filter>
-    <Filter Include="Translation Files">
-      <UniqueIdentifier>{639EADAA-A684-42e4-A9AD-28FC9BCB8F7C}</UniqueIdentifier>
-      <Extensions>ts</Extensions>
-    </Filter>
+    <Filter Include="Header Files" />
+    <Filter Include="Header Files\MainWindow" />
+    <Filter Include="Header Files\Pages" />
+    <Filter Include="Header Files\Pages\HomePage" />
+    <Filter Include="Header Files\Pages\ParamPage" />
+    <Filter Include="Header Files\Pages\MeasurePage" />
+    <Filter Include="Header Files\Ultrasonic" />
+    <Filter Include="Header Files\Widgets" />
+    <Filter Include="Header Files\Widgets\AScanWidget" />
+    <Filter Include="Header Files\Widgets\BScanWidget" />
+    <Filter Include="Header Files\Widgets\CScanWidget" />
+
+    <Filter Include="Source Files" />
+    <Filter Include="Source Files\Application" />
+    <Filter Include="Source Files\MainWindow" />
+    <Filter Include="Source Files\Pages" />
+    <Filter Include="Source Files\Pages\HomePage" />
+    <Filter Include="Source Files\Pages\ParamPage" />
+    <Filter Include="Source Files\Pages\MeasurePage" />
+    <Filter Include="Source Files\Ultrasonic" />
+    <Filter Include="Source Files\Widgets" />
+    <Filter Include="Source Files\Widgets\AScanWidget" />
+    <Filter Include="Source Files\Widgets\BScanWidget" />
+    <Filter Include="Source Files\Widgets\CScanWidget" />
+
+    <Filter Include="Resource Files" />
   </ItemGroup>
+
+  <!-- ================================================================ -->
+  <!--  Header Files                                                    -->
+  <!-- ================================================================ -->
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Widgets\AScanWidget\AScanWidget.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Widgets\BScanWidget\BScanWidget.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Widgets\CScanWidget\CScanWidget.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Ultrasonic\CTSPA22SDriver.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Ultrasonic\CScanDataCodec.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Ultrasonic\CScanEngine.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\HomePage\HomePage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\TransmitParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ReceiveParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\GateParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ProbeParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\WedgeParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\WorkpieceParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ScanParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\TcgParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ImagingParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\EncoderParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\AnalysisParamPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.Model.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.CScanPages.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.CalibrationPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.ScanPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.WorkpiecePage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.WedgePage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.ProbePage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.GatePage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.ReceivePage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\ParamPage\ParamPage.TransmitPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MainWindow\MainWindow.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <QtMoc Include="Widgets\AScanWidget\AScanWidget.h">
-      <Filter>Header Files</Filter>
+    <QtMoc Include="MainWindow\MainWindow.h">
+      <Filter>Header Files\MainWindow</Filter>
     </QtMoc>
-    <QtMoc Include="Widgets\BScanWidget\BScanWidget.h">
-      <Filter>Header Files</Filter>
+    <QtMoc Include="MainWindow\HeaderBar.h">
+      <Filter>Header Files\MainWindow</Filter>
     </QtMoc>
-    <QtMoc Include="Widgets\CScanWidget\CScanWidget.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="Ultrasonic\CTSPA22SDriver.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="Ultrasonic\CScanEngine.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
+
     <QtMoc Include="Pages\HomePage\HomePage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\HomePage</Filter>
     </QtMoc>
+
     <QtMoc Include="Pages\ParamPage\ParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <ClInclude Include="Pages\ParamPage\ParamPageUiHelpers.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </ClInclude>
     <QtMoc Include="Pages\ParamPage\TransmitParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\ReceiveParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\GateParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\ProbeParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\WedgeParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\WorkpieceParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\ScanParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\TcgParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\ImagingParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\EncoderParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
     <QtMoc Include="Pages\ParamPage\AnalysisParamPage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\ParamPage</Filter>
     </QtMoc>
+
     <QtMoc Include="Pages\MeasurePage\MeasurePage.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Pages\MeasurePage</Filter>
     </QtMoc>
-    <QtMoc Include="MainWindow\MainWindow.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-  </ItemGroup>
-  <ItemGroup>
+
     <QtMoc Include="Ultrasonic\IDriver.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Ultrasonic</Filter>
+    </QtMoc>
+    <QtMoc Include="Ultrasonic\CTSPA22SDriver.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </QtMoc>
+    <QtMoc Include="Ultrasonic\CScanEngine.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </QtMoc>
+    <QtMoc Include="Ultrasonic\CalibrationController.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </QtMoc>
+    <QtMoc Include="Ultrasonic\ConnectionManager.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </QtMoc>
+    <QtMoc Include="Ultrasonic\CScanIOManager.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </QtMoc>
+    <QtMoc Include="Ultrasonic\ParameterDispatcher.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </QtMoc>
+    <QtMoc Include="Ultrasonic\DataPacketProcessor.h">
+      <Filter>Header Files\Ultrasonic</Filter>
     </QtMoc>
     <ClInclude Include="Ultrasonic\DataTypes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Ultrasonic\CScanDataCodec.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Ultrasonic</Filter>
     </ClInclude>
     <ClInclude Include="Ultrasonic\PAParams.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Ultrasonic</Filter>
     </ClInclude>
+    <ClInclude Include="Ultrasonic\CScanDataCodec.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </ClInclude>
+    <ClInclude Include="Ultrasonic\ColorMap.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </ClInclude>
+    <ClInclude Include="Ultrasonic\Theme.h">
+      <Filter>Header Files\Ultrasonic</Filter>
+    </ClInclude>
+
+    <QtMoc Include="Widgets\AScanWidget\AScanWidget.h">
+      <Filter>Header Files\Widgets\AScanWidget</Filter>
+    </QtMoc>
+    <QtMoc Include="Widgets\BScanWidget\BScanWidget.h">
+      <Filter>Header Files\Widgets\BScanWidget</Filter>
+    </QtMoc>
+    <QtMoc Include="Widgets\CScanWidget\CScanWidget.h">
+      <Filter>Header Files\Widgets\CScanWidget</Filter>
+    </QtMoc>
+  </ItemGroup>
+
+  <!-- ================================================================ -->
+  <!--  Source Files                                                    -->
+  <!-- ================================================================ -->
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files\Application</Filter>
+    </ClCompile>
+
+    <ClCompile Include="MainWindow\MainWindow.cpp">
+      <Filter>Source Files\MainWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="MainWindow\HeaderBar.cpp">
+      <Filter>Source Files\MainWindow</Filter>
+    </ClCompile>
+
+    <ClCompile Include="Pages\HomePage\HomePage.cpp">
+      <Filter>Source Files\Pages\HomePage</Filter>
+    </ClCompile>
+
+    <ClCompile Include="Pages\ParamPage\ParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\TransmitParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ReceiveParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\GateParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ProbeParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\WedgeParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\WorkpieceParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ScanParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\TcgParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ImagingParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\EncoderParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\AnalysisParamPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.Model.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.CScanPages.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.CalibrationPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.ScanPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.WorkpiecePage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.WedgePage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.ProbePage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.GatePage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.ReceivePage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+    <ClCompile Include="Pages\ParamPage\ParamPage.TransmitPage.cpp">
+      <Filter>Source Files\Pages\ParamPage</Filter>
+    </ClCompile>
+
+    <ClCompile Include="Pages\MeasurePage\MeasurePage.cpp">
+      <Filter>Source Files\Pages\MeasurePage</Filter>
+    </ClCompile>
+
+    <ClCompile Include="Ultrasonic\CalibrationController.cpp">
+      <Filter>Source Files\Ultrasonic</Filter>
+    </ClCompile>
+    <ClCompile Include="Ultrasonic\ConnectionManager.cpp">
+      <Filter>Source Files\Ultrasonic</Filter>
+    </ClCompile>
+    <ClCompile Include="Ultrasonic\CScanIOManager.cpp">
+      <Filter>Source Files\Ultrasonic</Filter>
+    </ClCompile>
+    <ClCompile Include="Ultrasonic\ParameterDispatcher.cpp">
+      <Filter>Source Files\Ultrasonic</Filter>
+    </ClCompile>
+    <ClCompile Include="Ultrasonic\DataPacketProcessor.cpp">
+      <Filter>Source Files\Ultrasonic</Filter>
+    </ClCompile>
+    <ClCompile Include="Ultrasonic\CTSPA22SDriver.cpp">
+      <Filter>Source Files\Ultrasonic</Filter>
+    </ClCompile>
+    <ClCompile Include="Ultrasonic\CScanDataCodec.cpp">
+      <Filter>Source Files\Ultrasonic</Filter>
+    </ClCompile>
+    <ClCompile Include="Ultrasonic\CScanEngine.cpp">
+      <Filter>Source Files\Ultrasonic</Filter>
+    </ClCompile>
+
+    <ClCompile Include="Widgets\AScanWidget\AScanWidget.cpp">
+      <Filter>Source Files\Widgets\AScanWidget</Filter>
+    </ClCompile>
+    <ClCompile Include="Widgets\BScanWidget\BScanWidget.cpp">
+      <Filter>Source Files\Widgets\BScanWidget</Filter>
+    </ClCompile>
+    <ClCompile Include="Widgets\CScanWidget\CScanWidget.cpp">
+      <Filter>Source Files\Widgets\CScanWidget</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

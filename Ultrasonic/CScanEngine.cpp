@@ -45,8 +45,14 @@ void CScanEngine::stop()
         return;
     }
     if (m_scanning && m_capturedLines > 0) {
+        auto plain = std::make_shared<QVector<DataPacket>>();
+        plain->reserve(m_archivedPackets.size());
+        for (const auto &sp : m_archivedPackets)
+            plain->append(sp ? *sp : DataPacket{});
+        m_archivedSnapshot = plain;
         emit imageUpdated(m_image.mid(0, m_capturedLines * CScanWidth),
-                          CScanWidth, m_capturedLines);
+                          CScanWidth, m_capturedLines,
+                          m_imgSpanStart, m_imgSpanEnd);
     }
     m_scanning = false;
 }
@@ -61,11 +67,12 @@ void CScanEngine::clear()
     m_capturedLines = 0;
     m_lastLine = -1;
     m_archivedPackets.clear();
+    m_archivedSnapshot.reset();
     m_traceBaseB = 0;
     m_traceBaseC = 0;
     std::fill(std::begin(m_shiftA1), std::end(m_shiftA1), 0);
     std::fill(std::begin(m_shiftA2), std::end(m_shiftA2), 0);
-    emit imageUpdated({}, CScanWidth, 0);
+    emit imageUpdated({}, CScanWidth, 0, m_imgSpanStart, m_imgSpanEnd);
     emit progressChanged(0, CScanLineCount);
 }
 
@@ -76,7 +83,12 @@ void CScanEngine::setArchivedPackets(const QVector<DataPacket> &packets)
                                   Qt::BlockingQueuedConnection);
         return;
     }
-    m_archivedPackets = packets;
+    m_archivedPackets.clear();
+    m_archivedPackets.reserve(packets.size());
+    for (const auto &p : packets)
+        m_archivedPackets.append(std::make_shared<const DataPacket>(p));
+    auto plain = std::make_shared<QVector<DataPacket>>(packets);
+    m_archivedSnapshot = plain;
 }
 
 void CScanEngine::setRulePositions(const QVector<double> &positions)
@@ -130,13 +142,22 @@ QVector<float> CScanEngine::image() const
     return result;
 }
 
-QVector<DataPacket> CScanEngine::archivedPackets() const
+std::shared_ptr<const QVector<DataPacket>> CScanEngine::archivedPackets() const
 {
-    if (QThread::currentThread() == thread()) return m_archivedPackets;
-    QVector<DataPacket> result;
+    auto build = [](const QVector<std::shared_ptr<const DataPacket>> &src) {
+        auto v = std::make_shared<QVector<DataPacket>>();
+        v->reserve(src.size());
+        for (const auto &sp : src)
+            v->append(sp ? *sp : DataPacket{});
+        return std::shared_ptr<const QVector<DataPacket>>(v);
+    };
+    if (QThread::currentThread() == thread())
+        return m_archivedSnapshot ? m_archivedSnapshot : build(m_archivedPackets);
+    std::shared_ptr<const QVector<DataPacket>> result;
     QMetaObject::invokeMethod(const_cast<CScanEngine *>(this),
-                              [this, &result] { result = m_archivedPackets; },
-                              Qt::BlockingQueuedConnection);
+                              [this, &result, &build] {
+        result = m_archivedSnapshot ? m_archivedSnapshot : build(m_archivedPackets);
+    }, Qt::BlockingQueuedConnection);
     return result;
 }
 
@@ -309,11 +330,16 @@ void CScanEngine::processPacket(std::shared_ptr<DataPacket> packet)
     if (!m_scanning || !packet || packet->beamCount <= 0)
         return;
 
-    DataPacket workingPacket = *packet;
-    if (m_params.wp.traceEnable)
+    // 仅在 trace 模式下拷贝 DataPacket（~53KB），非 trace 模式直接读原始数据
+    DataPacket workingPacket;
+    const DataPacket *wp = packet.get();
+    if (m_params.wp.traceEnable) {
+        workingPacket = *packet;
         applyTrace(workingPacket);
+        wp = &workingPacket;
+    }
 
-    int lineIndex = encoderLine(workingPacket.beams[0]);
+    int lineIndex = encoderLine(wp->beams[0]);
     if (lineIndex < 0)
         return;
     if (lineIndex >= CScanLineCount) {
@@ -327,15 +353,15 @@ void CScanEngine::processPacket(std::shared_ptr<DataPacket> packet)
     }
 
     const QVector<float> row = m_params.wp.traceEnable
-        ? buildTraceRow(workingPacket)
-        : buildCScanRow(softwareImaging(workingPacket));
+        ? buildTraceRow(*wp)
+        : buildCScanRow(softwareImaging(*wp));
     if (m_lastLine <= lineIndex) {
         const int first = m_lastLine < 0 ? 0 : m_lastLine + 1;
         if (m_archivedPackets.size() <= lineIndex)
             m_archivedPackets.resize(lineIndex + 1);
         for (int y = first; y <= lineIndex; ++y) {
             std::copy(row.cbegin(), row.cend(), m_image.begin() + y * CScanWidth);
-            m_archivedPackets[y] = *packet;
+            m_archivedPackets[y] = packet;  // shared_ptr：连续行共享同一包
         }
     } else {
         std::fill(m_image.begin() + lineIndex * CScanWidth,
@@ -343,7 +369,7 @@ void CScanEngine::processPacket(std::shared_ptr<DataPacket> packet)
         std::copy(row.cbegin(), row.cend(), m_image.begin() + lineIndex * CScanWidth);
         if (m_archivedPackets.size() <= lineIndex)
             m_archivedPackets.resize(lineIndex + 1);
-        m_archivedPackets[lineIndex] = *packet;
+        m_archivedPackets[lineIndex] = packet;
     }
 
     m_lastLine = lineIndex;
@@ -352,7 +378,8 @@ void CScanEngine::processPacket(std::shared_ptr<DataPacket> packet)
     if (m_lastImageMs == 0 || elapsedMs - m_lastImageMs >= 50
             || m_capturedLines >= CScanLineCount) {
         emit imageUpdated(m_image.mid(0, m_capturedLines * CScanWidth),
-                          CScanWidth, m_capturedLines);
+                          CScanWidth, m_capturedLines,
+                          m_imgSpanStart, m_imgSpanEnd);
         m_lastImageMs = elapsedMs;
     }
     emit progressChanged(m_capturedLines, CScanLineCount);

@@ -1,15 +1,11 @@
 #include "CalibrationController.h"
 #include "CScanEngine.h"
-#include "HomePage.h"
 #include "IDriver.h"
-#include "ParamPage.h"
-#include <QMessageBox>
 #include <QtGlobal>
 
-CalibrationController::CalibrationController(IDriver *driver, ParamPage *paramPage,
-        CScanEngine *cScanEngine, HomePage *homePage, QObject *parent)
-    : QObject(parent), m_driver(driver), m_paramPage(paramPage),
-      m_cScanEngine(cScanEngine), m_homePage(homePage)
+CalibrationController::CalibrationController(IDriver *driver, CScanEngine *cScanEngine,
+                                             QObject *parent)
+    : QObject(parent), m_driver(driver), m_cScanEngine(cScanEngine)
 {
 }
 
@@ -26,21 +22,16 @@ void CalibrationController::onCalibrationRequested(int item)
     if (!m_calibrating) {
         m_calibrating = true;
         m_calibrationItem = item;
-        const PAParams &p = m_paramPage->params();
+        const PAParams &p = *m_params;
         if (item == 2 || item == 3) {
-            const bool useFifty = QMessageBox::question(
-                qobject_cast<QWidget*>(parent()), "校准参考线",
-                "默认参考线为80%，是否改为50%？",
-                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes;
-            m_calibrationTargetPercent = useFifty ? 50 : 80;
-            m_homePage->setAScanCalibrationGuide(true, m_calibrationTargetPercent);
+            emit calibrationGuideChanged(true, m_calibrationTargetPercent);
         } else {
-            m_homePage->setAScanCalibrationGuide(false);
+            emit calibrationGuideChanged(false, 0);
         }
         const int centerBeam = p.scan.scanType == 0 ? 63
             : (p.scan.scanType == 1 ? (p.probe.probeCount - p.scan.eleAperture + 1) / 2
                                : p.probe.probeCount / 2);
-        if (item < 3) m_paramPage->setBeamNo(qBound(0, centerBeam, MaxBeams - 1));
+        if (item < 3) emit beamSelectRequested(qBound(0, centerBeam, MaxBeams - 1));
         if (item == 2) m_driver->setACG(false, p);
         if (item == 3) m_driver->setTCG(false, p);
         emit statusMessage("校准已开始，取得稳定回波后再次点击完成");
@@ -51,24 +42,34 @@ void CalibrationController::onCalibrationRequested(int item)
         return;
     }
 
-    const PAParams &p = m_paramPage->params();
+    const PAParams &p = *m_params;
     const int beam = qBound(0, p.rx.curBeam, m_latestPacket->beamCount - 1);
     const BeamWaveform &wave = m_latestPacket->beams[beam];
     auto pathMm = [&p](quint16 path) {
         return p.gate.gateTrace[2] ? path * p.tx.range / WaveSampleCount
                               : path * S22_SP * p.wp.lVelocity / 2000000.0;
     };
+    bool ok = false;
     if (m_calibrationItem == 0) {
-        const double difference = pathMm(wave.path1) - pathMm(wave.path0);
-        if (difference > 1.0)
-            m_paramPage->setCalibratedVelocity(qRound(p.tcg.realDistance * p.wp.lVelocity / difference));
-        m_driver->setVelocity(m_paramPage->params().wp.lVelocity);
-        m_driver->setRange(m_paramPage->params().tx.range);
+        if (p.wp.lVelocity <= 0 || p.tcg.realDistance <= 0.0) {
+            emit statusMessage("声速或实际距离参数无效");
+        } else {
+            const double difference = pathMm(wave.path1) - pathMm(wave.path0);
+            if (difference > 1.0) {
+                emit velocityCalibrated(qRound(p.tcg.realDistance * p.wp.lVelocity / difference));
+                ok = true;
+            } else {
+                emit statusMessage("闸门读数差异过小，无法校准声速");
+            }
+        }
     } else if (m_calibrationItem == 1) {
-        const float delay = float((pathMm(wave.path0) - p.tcg.realDistance)
-                            * 2000.0 / p.wp.lVelocity + p.probe.probeDelay);
-        m_paramPage->setCalibratedProbeDelay(delay);
-        if (p.scan.scanType < 3) m_driver->setBeamDelay(); else m_driver->setCommonRDelay();
+        if (p.wp.lVelocity <= 0) {
+            emit statusMessage("工件声速参数无效");
+        } else {
+            emit probeDelayCalibrated(float((pathMm(wave.path0) - p.tcg.realDistance)
+                                      * 2000.0 / p.wp.lVelocity + p.probe.probeDelay));
+            ok = true;
+        }
     } else if (m_calibrationItem == 2) {
         QVector<float> values(m_latestPacket->beamCount, 1.0f);
         for (int i = 0; i < m_latestPacket->beamCount; ++i) {
@@ -77,15 +78,17 @@ void CalibrationController::onCalibrationRequested(int item)
                 ? qBound(0.0f, m_calibrationTargetPercent * 2.5f / amplitude, 256.0f)
                 : 256.0f;
         }
-        m_paramPage->setCalibratedACG(values);
-        m_driver->setACG(true, m_paramPage->params());
+        emit acgCalibrated(values);
+        ok = true;
     } else if (m_calibrationItem == 3) {
         m_driver->setTCG(true, p);
+        ok = true;
     }
     m_calibrating = false;
     m_calibrationItem = -1;
-    m_homePage->setAScanCalibrationGuide(false);
-    emit statusMessage("校准完成并已应用");
+    emit calibrationGuideChanged(false, 0);
+    if (ok)
+        emit statusMessage("校准完成并已应用");
 }
 
 void CalibrationController::onEncoderCalibrationRequested()
@@ -107,9 +110,9 @@ void CalibrationController::onEncoderCalibrationRequested()
     } else {
         const int pulses = qAbs(position - m_encoderCalibrationStart);
         if (pulses > 0)
-            m_paramPage->setCalibratedCoderDeg(m_paramPage->params().enc.checkDistance / pulses);
+            emit coderDegCalibrated(m_params->enc.checkDistance / pulses);
         m_encoderCalibrating = false;
         emit statusMessage(QString("编码器精度：%1 mm/p")
-            .arg(m_paramPage->params().enc.coderDeg, 0, 'f', 4));
+            .arg(m_params->enc.coderDeg, 0, 'f', 4));
     }
 }

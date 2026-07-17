@@ -5,11 +5,11 @@
 #include <QVector>
 #include <QPainter>
 #include "DataTypes.h"
+#include <QVector>
 struct PAParams;
 class AScanWidget;
 class BScanWidget;
 class CScanWidget;
-class IDriver;
 
 /// @brief 自动省略文本的标签
 class ElidedLabel : public QLabel
@@ -62,8 +62,13 @@ class HomePage : public QWidget
 	Q_OBJECT
 public:
 	explicit HomePage(QWidget* parent = nullptr);
-	void setDriver(IDriver* driver);
 	void bindParams(const PAParams *params);
+
+	// A/B 扫描数据入口（由 MainWindow 从 Driver 信号转发）
+	void setAScanWaveform(const QVector<double> &data, int beamIndex,
+	                      int frameIndex, int rectifyMode);
+	void setBScanWaveforms(const QVector<QVector<double>> &waves);
+	void updateFrameStatistics(int frameDiff, quint64 droppedFrames);
 
 	// 闸门可视化
 	void setGateParams(int gate, bool enabled, float start, float width,
@@ -81,7 +86,6 @@ public:
 	void setCScanData(const QVector<float> &data, int w, int h);
 	void updateCScanMetrics(int lines, int totalLines, double scannedMm,
 	                        double speedMmPerSec, double averageMmPerSec);
-	void updateFrameStatistics(int frameDiff, quint64 droppedFrames);
 	void showReplayPacket(const DataPacket &packet, int line, int beamIndex, int rectifyMode);
 	void selectCScanLine(int line);
 	void configureCScanView(const PAParams &params);
@@ -100,7 +104,6 @@ private:
 	AScanWidget* m_aScan;
 	BScanWidget* m_bScan;
 	CScanWidget* m_cScan;
-	QLabel*      m_status;
 	ElidedLabel* m_scanLengthStatus = nullptr;
 	ElidedLabel* m_scannedLengthStatus = nullptr;
 	ElidedLabel* m_progressStatus = nullptr;

@@ -30,7 +30,10 @@ public:
     QVector<DriverFrame> feed(const QByteArray &data);
 
     /// 从一帧 PA 载荷中解出 DataPacket（128 声束 + 编码器）
-    static DataPacket parseWaveforms(const QByteArray &payload);
+    /// @param aDataLen 单声束数据长度：0=128, 1=256, 2=512 字节
+    /// @param range    检测范围 mm（用于短量程 200→400 插值）
+    static DataPacket parseWaveforms(const QByteArray &payload, int aDataLen = 2,
+                                     float range = 100.0f);
 
     /// 从一帧 TFM 载荷中解出 256×256 int32 图像
     static QVector<int> parseTFMImage(const QByteArray &payload);
@@ -81,6 +84,7 @@ public:
     bool connectDevice(ConnectionMode mode) override;
     void disconnectDevice() override;
     bool isConnected() const override;
+    bool isBusy() const { return m_rpcBusy; }    // RPC/连接进行中
     void startAcquisition() override;
     void stopAcquisition() override;
 
@@ -200,6 +204,10 @@ private:
     float m_angleTo      = 70.0f;
     float m_focus        = 50.0f;
     float m_velocity     = 5900.0f;
+
+    // 命令响应持久缓冲（跨 sendJsonCommand 调用保存半帧数据）
+    QByteArray m_cmdReadBuffer;
+    bool m_rpcBusy = false;  // RPC 重入保护：同一时刻只允许一条等待响应的命令
 
     // 楔块参数
     bool  m_wedgeEnable  = false;

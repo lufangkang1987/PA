@@ -3,42 +3,35 @@
 #include <QObject>
 #include <QString>
 
-class QComboBox;
-class QLabel;
-class QPushButton;
 class IDriver;
 
-/// 连接管理器 — 所有网络连接/断开/模式切换逻辑从 MainWindow 分离
+/// 连接管理器 — 纯业务逻辑，通过信号与 UI 通信
+///
+/// 依赖：IDriver（同层）
+/// 不依赖任何 Pages/ 或 Widgets/ 层，不持有任何 QWidget 指针
 class ConnectionManager : public QObject
 {
     Q_OBJECT
 public:
-    ConnectionManager(IDriver *driver, QComboBox *modeCombo, QLabel *deviceLabel,
-                      QLabel *ipLabel, QPushButton *connectBtn, QPushButton *acquireBtn,
-                      QObject *parent = nullptr);
-
-    void initialize();
+    explicit ConnectionManager(IDriver *driver, QObject *parent = nullptr);
 
 public slots:
     void onConnectButtonClicked();
     void onAcquireButtonClicked();
-    void onModeChanged(int index);
-    void onDriverConnectionChanged(bool connected);
+    void setConnectionMode(ConnectionMode mode);
 
 signals:
     void statusMessage(const QString &msg);
+    void connectionStateChanged(bool connected);
+    void acquireStateChanged(bool acquiring);
+    void ipAddressChanged(const QString &ip);
     void acquireStarted();
     void acquireStopped();
 
 private:
-    void updateConnectionUi(bool connected);
-    void updateAcquireUi(bool connected, bool acquiring);
+    void updateAcquire(bool acquiring);
 
-    IDriver     *m_driver;
-    QComboBox   *m_modeCombo;
-    QLabel      *m_deviceLabel;
-    QLabel      *m_ipLabel;
-    QPushButton *m_connectBtn;
-    QPushButton *m_acquireBtn;
-    bool m_acquiring = false;
+    IDriver       *m_driver = nullptr;
+    ConnectionMode m_connectionMode = ConnectionMode::Wireless;
+    bool           m_acquiring = false;
 };

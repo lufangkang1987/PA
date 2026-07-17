@@ -2,8 +2,6 @@
 #include "AScanWidget.h"
 #include "BScanWidget.h"
 #include "CScanWidget.h"
-#include "IDriver.h"
-#include "CTSPA22SDriver.h"
 #include "PAParams.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -189,6 +187,8 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 		emit cScanAnalysisMeasured(maximum, average, maxLine, maxColumn);
 	});
 
+		connect(m_aScan, &AScanWidget::gateDragged, this, &HomePage::gateDragged);
+		connect(m_aScan, &AScanWidget::beamChangeRequested, this, &HomePage::beamChangeRequested);
 	// ── 默认闸门参数 ──
 	setGateParams(0, true,  2.5f, 4.0f, 40.0f, QColor(255, 30, 30));
 	setGateParams(1, true,  6.2f, 3.0f, 30.0f, QColor(255, 200, 0));
@@ -263,30 +263,24 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 		if (m_bScan) m_bScan->update();
 		if (m_cScan) m_cScan->update();
 	});
+	}
+
+void HomePage::setAScanWaveform(const QVector<double> &data, int beamIndex,
+                                 int frameIndex, int rectifyMode)
+{
+    if (m_aScan)
+        m_aScan->setWaveform(data, beamIndex, frameIndex, rectifyMode);
 }
 
-void HomePage::setDriver(IDriver* driver)
+void HomePage::setBScanWaveforms(const QVector<QVector<double>> &waves)
 {
-	if (!driver) return;
-
-
-	connect(m_aScan, &AScanWidget::gateDragged, this, &HomePage::gateDragged);
-	connect(m_aScan, &AScanWidget::beamChangeRequested, this, &HomePage::beamChangeRequested);
-
-	{
-		connect(driver, &IDriver::waveformReady, m_aScan, &AScanWidget::setWaveform);
-		connect(driver, &IDriver::frameStatisticsChanged,
-		        this, &HomePage::updateFrameStatistics);
-		connect(driver, &IDriver::multiBeamWaveformsReady, this, [this](const QVector<QVector<double>> &waves) {
-			m_bScan->setMultiBeamData(waves, /*isRF*/ false);
-			bool alarm = false;
-			for (const auto &w : waves)
-				for (const auto &v : w) { if (v > 0.8) { alarm = true; break; } }
-			if (m_aScan) m_aScan->setAlarm(alarm);
-		});
-
-		return;
-	}
+    if (m_bScan)
+        m_bScan->setMultiBeamData(waves, false);
+    bool alarm = false;
+    for (const auto &w : waves)
+        for (const auto &v : w) { if (v > 0.8) { alarm = true; break; } }
+    if (m_aScan)
+        m_aScan->setAlarm(alarm);
 }
 
 void HomePage::bindParams(const PAParams *params)

@@ -9,6 +9,7 @@
 #include <memory>
 #include <cstdint>
 #include <cstring>
+#include "Logging/Logger.h"
 
 // ================================================================
 // MTLDParser 实现
@@ -225,9 +226,11 @@ CTSPA22SDriver::~CTSPA22SDriver()
 // ================================================================
 
 bool CTSPA22SDriver::connectDevice(const QString &ip,
-                                    quint16 cmdPort,
-                                    quint16 dataPort)
+                                     quint16 cmdPort,
+                                     quint16 dataPort)
 {
+    PA_LOG_INFO("NETWORK", QStringLiteral("Connect requested ip=%1 cmdPort=%2 dataPort=%3")
+                .arg(ip).arg(cmdPort).arg(dataPort));
     if (m_connected) {
         emit statusChanged(QString::fromUtf8("已经连接"));
         return true;
@@ -306,6 +309,8 @@ bool CTSPA22SDriver::connectDevice(ConnectionMode mode)
 
 void CTSPA22SDriver::disconnectDevice()
 {
+    PA_LOG_INFO("NETWORK", QStringLiteral("Disconnect requested connected=%1 acquiring=%2")
+                .arg(m_connected).arg(m_acquiring));
     // 停止采集（仅尝试发送 stop 命令，不等响应）
     if (m_acquiring) {
         QJsonObject cmd;
@@ -346,6 +351,8 @@ bool CTSPA22SDriver::isConnected() const
 
 void CTSPA22SDriver::startAcquisition()
 {
+    PA_LOG_INFO("ACQUISITION", QStringLiteral("Start requested scanType=%1 aDataLen=%2 range=%3")
+                .arg(m_scanType).arg(m_aDataLen).arg(m_range));
     if (!m_connected) {
         emit statusChanged(QString::fromUtf8("未连接，无法启动采集"));
         return;
@@ -372,6 +379,8 @@ void CTSPA22SDriver::startAcquisition()
 
 void CTSPA22SDriver::stopAcquisition()
 {
+    PA_LOG_INFO("ACQUISITION", QStringLiteral("Stop requested droppedFrames=%1")
+                .arg(m_droppedFrames));
     if (!m_acquiring) return;
 
     QJsonObject cmd;
@@ -403,7 +412,17 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
         // === 常规 PA 扫描 ===
         auto pkt = std::make_shared<DataPacket>(MTLDParser::parseWaveforms(frame.payload, m_aDataLen, m_range));
 
-        if (pkt->beamCount < 1) return;
+        if (pkt->beamCount < 1) {
+            PA_LOG_WARNING("DATA", QStringLiteral("Empty waveform packet payloadBytes=%1")
+                           .arg(frame.payload.size()));
+            return;
+        }
+
+        if ((pkt->frameIndex % 100) == 0) {
+            PA_LOG_DEBUG("DATA", QStringLiteral("Wave frame=%1 beams=%2 payloadBytes=%3 aDataLen=%4 range=%5")
+                         .arg(pkt->frameIndex).arg(pkt->beamCount).arg(frame.payload.size())
+                         .arg(m_aDataLen).arg(m_range));
+        }
 
         const quint16 currentFrame = pkt->beams[0].frame;
         int frameDiff = 0;
@@ -411,8 +430,12 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
             frameDiff = static_cast<quint16>(currentFrame - m_lastWaveFrame);
             if (frameDiff > 32768)
                 frameDiff = 0;
-            if (frameDiff > 1)
+            if (frameDiff > 1) {
                 m_droppedFrames += static_cast<quint64>(frameDiff - 1);
+                PA_LOG_WARNING("DATA", QStringLiteral("Dropped frames current=%1 previous=%2 diff=%3 total=%4")
+                               .arg(currentFrame).arg(m_lastWaveFrame).arg(frameDiff)
+                               .arg(m_droppedFrames));
+            }
         }
         m_lastWaveFrame = currentFrame;
         m_hasLastWaveFrame = true;
@@ -477,6 +500,11 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
         }
 
     } else if (frame.type == "Ts22t") {
+        static quint64 tfmFrameCount = 0;
+        ++tfmFrameCount;
+        if ((tfmFrameCount % 100) == 0)
+            PA_LOG_DEBUG("DATA", QStringLiteral("TFM frameCount=%1 payloadBytes=%2")
+                         .arg(tfmFrameCount).arg(frame.payload.size()));
         // === TFM 扫描 ===
         QVector<int> image = MTLDParser::parseTFMImage(frame.payload);
 
@@ -491,6 +519,7 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
 void CTSPA22SDriver::onCmdConnected()
 {
+    PA_LOG_INFO("NETWORK", QStringLiteral("Command channel connected"));
     m_cmdReady = true;
     if (m_cmdReady && m_dataReady && !m_connected) {
         m_connected = true;
@@ -501,6 +530,7 @@ void CTSPA22SDriver::onCmdConnected()
 
 void CTSPA22SDriver::onCmdDisconnected()
 {
+    PA_LOG_WARNING("NETWORK", QStringLiteral("Command channel disconnected"));
     m_cmdReady = false;
     if (m_connected) {
         // 命令通道断开意味着整个连接不可用，做完整清理
@@ -516,6 +546,8 @@ void CTSPA22SDriver::onCmdDisconnected()
 
 void CTSPA22SDriver::onCmdError(QAbstractSocket::SocketError err)
 {
+    PA_LOG_ERROR("NETWORK", QStringLiteral("Command channel error code=%1 text=%2")
+                 .arg(static_cast<int>(err)).arg(m_cmdSocket->errorString()));
     const QString errStr = m_cmdSocket->errorString();
     // 严重错误：连接被拒绝 / 远端关闭 / 网络不可达 — 自动断开
     switch (err) {
@@ -539,6 +571,7 @@ void CTSPA22SDriver::onCmdError(QAbstractSocket::SocketError err)
 
 void CTSPA22SDriver::onDataConnected()
 {
+    PA_LOG_INFO("NETWORK", QStringLiteral("Data channel connected"));
     m_dataReady = true;
     if (m_cmdReady && m_dataReady && !m_connected) {
         m_connected = true;
@@ -549,6 +582,7 @@ void CTSPA22SDriver::onDataConnected()
 
 void CTSPA22SDriver::onDataDisconnected()
 {
+    PA_LOG_WARNING("NETWORK", QStringLiteral("Data channel disconnected"));
     m_dataReady = false;
     if (m_connected) {
         // 数据通道断开意味着无法接收波形，做完整清理
@@ -563,6 +597,8 @@ void CTSPA22SDriver::onDataDisconnected()
 
 void CTSPA22SDriver::onDataError(QAbstractSocket::SocketError err)
 {
+    PA_LOG_ERROR("NETWORK", QStringLiteral("Data channel error code=%1 text=%2")
+                 .arg(static_cast<int>(err)).arg(m_dataSocket->errorString()));
     const QString errStr = m_dataSocket->errorString();
     // 严重错误：自动断开
     switch (err) {
@@ -599,6 +635,8 @@ QJsonObject CTSPA22SDriver::sendJsonCommand(const QJsonObject &obj, bool waitFor
     // RPC 重入保护：等待响应期间禁止发送任何命令
     // QEventLoop::exec() 可能分发嵌套事件 → 用户操作 → 再次进入本函数
     if (m_rpcBusy) {
+        PA_LOG_WARNING("COMMAND", QStringLiteral("Rejected while RPC busy request=%1")
+                       .arg(QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact))));
         emit errorOccurred(QString::fromUtf8("RPC 正忙，上一命令尚未完成"));
         return {};
     }
@@ -615,10 +653,14 @@ QJsonObject CTSPA22SDriver::sendJsonCommand(const QJsonObject &obj, bool waitFor
 
     QJsonDocument doc(obj);
     QByteArray json = doc.toJson(QJsonDocument::Compact);
+    PA_LOG_INFO("COMMAND", QStringLiteral("TX waitForResponse=%1 bytes=%2 json=%3")
+                .arg(waitForResp).arg(json.size()).arg(QString::fromUtf8(json)));
     json.append('\x1E');
 
     const qint64 written = m_cmdSocket->write(json);
     if (written != json.size()) {
+        PA_LOG_ERROR("COMMAND", QStringLiteral("TX failed written=%1 expected=%2")
+                     .arg(written).arg(json.size()));
         emit errorOccurred(QString::fromUtf8("命令发送失败: write 返回 %1 (预期 %2)")
                            .arg(written).arg(json.size()));
         return {};
@@ -632,6 +674,9 @@ QJsonObject CTSPA22SDriver::sendJsonCommand(const QJsonObject &obj, bool waitFor
     m_rpcBusy = true;
     QJsonObject result = waitForResponse(3000);
     m_rpcBusy = false;
+    PA_LOG_INFO("COMMAND", QStringLiteral("RX completed success=%1 response=%2")
+                .arg(!result.isEmpty())
+                .arg(QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact))));
     return result;
 }
 
@@ -688,6 +733,8 @@ QJsonObject CTSPA22SDriver::waitForResponse(int timeoutMs)
 
     if (ok)
         return result;
+    if (timedOut)
+        PA_LOG_ERROR("COMMAND", QStringLiteral("RPC timeout timeoutMs=%1").arg(timeoutMs));
     if (timedOut)
         emit errorOccurred(QString::fromUtf8("命令响应超时 (%1ms)").arg(timeoutMs));
     else if (m_cmdSocket->state() != QAbstractSocket::ConnectedState)

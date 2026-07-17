@@ -4,6 +4,7 @@
 #include "PAParams.h"
 #include <QJsonObject>
 #include <QString>
+#include "Logging/Logger.h"
 
 CScanIOManager::CScanIOManager(CScanEngine *cScanEngine, QObject *parent)
     : QObject(parent), m_cScanEngine(cScanEngine)
@@ -22,11 +23,19 @@ bool CScanIOManager::saveToFile(const QString &path, const QVector<float> &data,
                                  int w, int h, const QJsonObject &params,
                                  const QVector<DataPacket> &packets) const
 {
-    return ::saveCScanFile(path, data, w, h, params, packets);
+    PA_LOG_INFO("STORAGE", QStringLiteral("Saving C-scan path=%1 width=%2 height=%3 packets=%4")
+                .arg(path).arg(w).arg(h).arg(packets.size()));
+    const bool ok = ::saveCScanFile(path, data, w, h, params, packets);
+    if (ok)
+        PA_LOG_INFO("STORAGE", QStringLiteral("C-scan saved path=%1").arg(path));
+    else
+        PA_LOG_ERROR("STORAGE", QStringLiteral("C-scan save failed path=%1").arg(path));
+    return ok;
 }
 
 void CScanIOManager::onReplayDataRequested(const QString &path)
 {
+    PA_LOG_INFO("STORAGE", QStringLiteral("Loading replay path=%1").arg(path));
     if (m_cScanEngine->isScanning()) {
         emit statusMessage("扫查期间不能进入回放");
         return;
@@ -37,6 +46,7 @@ void CScanIOManager::onReplayDataRequested(const QString &path)
     QVector<ScanRule> loadedRules;
     QVector<float> data = loadCScanFile(path, w, h, paramsJson, packets, &loadedRules);
     if (data.isEmpty() || w <= 0 || h <= 0) {
+        PA_LOG_ERROR("STORAGE", QStringLiteral("Replay load failed path=%1").arg(path));
         emit statusMessage("加载C扫数据失败");
         return;
     }
@@ -47,6 +57,8 @@ void CScanIOManager::onReplayDataRequested(const QString &path)
     m_replayCurPos = 0;
     m_cScanPageStart = 0;
     emit replayDataReady(data, w, h, paramsJson, packets, loadedRules);
+    PA_LOG_INFO("STORAGE", QStringLiteral("Replay loaded path=%1 width=%2 height=%3 packets=%4 rules=%5")
+                .arg(path).arg(w).arg(h).arg(packets.size()).arg(loadedRules.size()));
     emit statusMessage(QString("C扫回放: %1 (%2×%3)").arg(path).arg(w).arg(h));
 }
 

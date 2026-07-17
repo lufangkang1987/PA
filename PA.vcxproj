@@ -135,9 +135,14 @@
     <ClCompile Include="Widgets\BScanWidget\BScanWidget.cpp" />
     <ClCompile Include="Widgets\CScanWidget\CScanWidget.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Logging\Logger.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Widgets\AScanWidget\AScanWidget.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtRcc Include="resources\app_resources.qrc" />
+    <ResourceCompile Include="resources\app.rc" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Widgets\BScanWidget\BScanWidget.h" />
@@ -178,6 +183,7 @@
     <ClInclude Include="Ultrasonic\CScanDataCodec.h" />
     <QtMoc Include="Ultrasonic\IDriver.h" />
     <ClInclude Include="Ultrasonic\PAParams.h" />
+    <ClInclude Include="Logging\Logger.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

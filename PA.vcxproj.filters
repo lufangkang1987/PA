@@ -8,6 +8,7 @@
     <Filter Include="Header Files\Pages\ParamPage" />
     <Filter Include="Header Files\Pages\MeasurePage" />
     <Filter Include="Header Files\Ultrasonic" />
+    <Filter Include="Header Files\Logging" />
     <Filter Include="Header Files\Widgets" />
     <Filter Include="Header Files\Widgets\AScanWidget" />
     <Filter Include="Header Files\Widgets\BScanWidget" />
@@ -21,6 +22,7 @@
     <Filter Include="Source Files\Pages\ParamPage" />
     <Filter Include="Source Files\Pages\MeasurePage" />
     <Filter Include="Source Files\Ultrasonic" />
+    <Filter Include="Source Files\Logging" />
     <Filter Include="Source Files\Widgets" />
     <Filter Include="Source Files\Widgets\AScanWidget" />
     <Filter Include="Source Files\Widgets\BScanWidget" />
@@ -127,6 +129,9 @@
     <ClInclude Include="Ultrasonic\Theme.h">
       <Filter>Header Files\Ultrasonic</Filter>
     </ClInclude>
+    <ClInclude Include="Logging\Logger.h">
+      <Filter>Header Files\Logging</Filter>
+    </ClInclude>
 
     <QtMoc Include="Widgets\AScanWidget\AScanWidget.h">
       <Filter>Header Files\Widgets\AScanWidget</Filter>
@@ -145,6 +150,9 @@
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Source Files\Application</Filter>
+    </ClCompile>
+    <ClCompile Include="Logging\Logger.cpp">
+      <Filter>Source Files\Logging</Filter>
     </ClCompile>
 
     <ClCompile Include="MainWindow\MainWindow.cpp">
@@ -263,5 +271,13 @@
     <ClCompile Include="Widgets\CScanWidget\CScanWidget.cpp">
       <Filter>Source Files\Widgets\CScanWidget</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <QtRcc Include="resources\app_resources.qrc">
+      <Filter>Resource Files</Filter>
+    </QtRcc>
+    <ResourceCompile Include="resources\app.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

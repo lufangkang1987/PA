@@ -1,12 +1,19 @@
 #include <QApplication>
+#include <QIcon>
 #include <QScreen>
 #include "MainWindow/MainWindow.h"
+#include "Logging/Logger.h"
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     QApplication::setApplicationName("PA System");
     QApplication::setOrganizationName("NDT PA");
+    QApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/logo.ico")));
+
+    Logger::instance().initialize();
+    PA_LOG_INFO("APP", QStringLiteral("Application starting; log=%1")
+                .arg(Logger::instance().logFilePath()));
 
     MainWindow w;
 
@@ -24,5 +31,8 @@ int main(int argc, char *argv[])
     w.move(avail.x(), avail.y());
     w.resize(avail.width() - frameExtraW, avail.height() - frameExtraH);
 
-    return app.exec();
+    const int result = app.exec();
+    PA_LOG_INFO("APP", QStringLiteral("Application exiting; code=%1").arg(result));
+    Logger::instance().shutdown();
+    return result;
 }

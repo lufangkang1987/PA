@@ -45,8 +45,10 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
 
 private:
-    void rebuildMock(const QSize &size);
     void rebuildFromData();
+    int visibleLineCount() const;
+    int effectiveColumnCount() const;
+    float columnToPhysicalMm(int column) const;
 
     QImage m_cache;
 

@@ -5,6 +5,8 @@
 void ParamPage::buildTransmitPage()
 {
     m_transmitPage = new TransmitParamPage(&m_params, m_dispatcher, this);
+    connect(m_transmitPage, &TransmitParamPage::rangeChanged,
+            this, &ParamPage::rangeChanged);
     m_voltCombo = m_transmitPage->voltCombo;
     m_pulseWidthSpin = m_transmitPage->pulseWidthSpin;
     m_prfSpin = m_transmitPage->prfSpin;

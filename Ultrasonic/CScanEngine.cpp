@@ -70,6 +70,7 @@ void CScanEngine::clear()
     m_archivedSnapshot.reset();
     m_traceBaseB = 0;
     m_traceBaseC = 0;
+    m_traceBaseInitialized = false;
     std::fill(std::begin(m_shiftA1), std::end(m_shiftA1), 0);
     std::fill(std::begin(m_shiftA2), std::end(m_shiftA2), 0);
     emit imageUpdated({}, CScanWidth, 0, m_imgSpanStart, m_imgSpanEnd);
@@ -178,11 +179,24 @@ QVector<ScanRule> CScanEngine::currentScanRules(int beamCount)
 
 int CScanEngine::encoderLine(const BeamWaveform &beam) const
 {
-    const uint32_t pulses = m_params.wp.traceEnable
-        ? (beam.encFwd > beam.encRvs ? beam.encFwd - beam.encRvs : beam.encRvs - beam.encFwd)
-        : (m_params.enc.direction == 1 ? beam.encRvs : beam.encFwd);
+    // Keep the original MFC MakeCRecord / MakeCRecord_trace semantics:
+    // normal: direction 0=fwd, 1=rvs, >1=time base;
+    // trace : direction 0/1=absolute encoder difference, >1=time base.
+    quint64 counter = 0;
+    const int direction = m_params.enc.direction;
+    if (direction > 1) {
+        const qint64 elapsedMs = m_scanTimer.isValid() ? m_scanTimer.elapsed() : 0;
+        counter = quint64(qMax<qint64>(0, elapsedMs)) * quint64(direction - 1);
+    } else if (m_params.wp.traceEnable) {
+        counter = beam.encFwd >= beam.encRvs
+            ? quint64(beam.encFwd - beam.encRvs)
+            : quint64(beam.encRvs - beam.encFwd);
+    } else {
+        counter = direction == 1 ? quint64(beam.encRvs) : quint64(beam.encFwd);
+    }
+
     const double stepMm = std::max(0.1, static_cast<double>(m_params.img.degPerPoint));
-    return static_cast<int>(pulses * m_params.enc.coderDeg / stepMm);
+    return static_cast<int>(counter * m_params.enc.coderDeg / stepMm);
 }
 
 int CScanEngine::gateStartSample(int gate) const
@@ -199,7 +213,12 @@ int CScanEngine::gateWidthSamples(int gate) const
 
 void CScanEngine::initializeTrace(const DataPacket &packet)
 {
-    if (!m_params.wp.traceEnable || packet.beamCount <= 0) return;
+    if (!m_params.wp.traceEnable || packet.beamCount <= 0 || m_traceBaseInitialized)
+        return;
+    // MFC InitTrace samples the current beam once when trace mode is enabled.
+    // A missing B/C threshold crossing leaves that base at zero; it is not
+    // silently moved to a later frame.
+    m_traceBaseInitialized = true;
     const int beam = qBound(0, m_params.rx.curBeam, packet.beamCount - 1);
     const BeamWaveform &wave = packet.beams[beam];
     const int starts[2] = {gateStartSample(2), gateStartSample(1)};
@@ -355,18 +374,31 @@ void CScanEngine::processPacket(std::shared_ptr<DataPacket> packet)
     const QVector<float> row = m_params.wp.traceEnable
         ? buildTraceRow(*wp)
         : buildCScanRow(softwareImaging(*wp));
-    if (m_lastLine <= lineIndex) {
-        const int first = m_lastLine < 0 ? 0 : m_lastLine + 1;
+    const int writeX1 = m_params.wp.traceEnable
+        ? 0 : qBound(0, std::min(m_params.img.imgLineX1, m_params.img.imgLineX2), CScanWidth);
+    const int writeX2 = m_params.wp.traceEnable
+        ? CScanWidth - 1
+        : qBound(0, std::max(m_params.img.imgLineX1, m_params.img.imgLineX2), CScanWidth);
+    const auto writeCImageRow = [this, &row, writeX1, writeX2](int targetLine,
+                                                               bool clearFirst) {
+        const int base = targetLine * CScanWidth;
+        if (clearFirst) {
+            std::fill(m_image.begin() + base + writeX1,
+                      m_image.begin() + base + writeX2, 0.0f);
+        }
+        std::copy(row.cbegin() + writeX1, row.cbegin() + writeX2,
+                  m_image.begin() + base + writeX1);
+    };
+    if (m_capturedLines <= lineIndex) {
+        const int first = m_capturedLines;
         if (m_archivedPackets.size() <= lineIndex)
             m_archivedPackets.resize(lineIndex + 1);
         for (int y = first; y <= lineIndex; ++y) {
-            std::copy(row.cbegin(), row.cend(), m_image.begin() + y * CScanWidth);
+            writeCImageRow(y, false);
             m_archivedPackets[y] = packet;  // shared_ptr：连续行共享同一包
         }
     } else {
-        std::fill(m_image.begin() + lineIndex * CScanWidth,
-                  m_image.begin() + (lineIndex + 1) * CScanWidth, 0.0f);
-        std::copy(row.cbegin(), row.cend(), m_image.begin() + lineIndex * CScanWidth);
+        writeCImageRow(lineIndex, true);
         if (m_archivedPackets.size() <= lineIndex)
             m_archivedPackets.resize(lineIndex + 1);
         m_archivedPackets[lineIndex] = packet;

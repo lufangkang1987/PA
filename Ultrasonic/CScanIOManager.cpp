@@ -77,9 +77,11 @@ void CScanIOManager::onCScanPageRequested()
     if (!packets) return;
     const int count = packets->size();
     if (count <= 0) return;
-    const int maximumStart = qMax(0, count - CScanLinesPerPage);
     int ps = m_cScanPageStart + CScanLinesPerPage;
-    if (ps > maximumStart) ps = 0;
+    // MFC CScanShift advances by a complete 925-line page.  The final page
+    // may contain fewer than 925 lines; only wrap after its start passes the
+    // last captured line.
+    if (ps > count - 1) ps = 0;
     const int line = qBound(0, ps + m_params->ana.anaLineX1, count - 1);
     m_replayCurPos = line;
     m_cScanPageStart = ps;

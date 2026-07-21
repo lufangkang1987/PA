@@ -209,6 +209,9 @@ void MainWindow::wirePageSignals()
     connect(m_homePage, &HomePage::beamChangeRequested, this, [this](int beam) {
         m_paramPage->setBeamNo(beam);
     });
+    connect(m_paramPage, &ParamPage::rangeChanged, this, [this](float) {
+        m_homePage->bindParams(&m_paramPage->params());
+    });
 
     // 参数页闸门变化 → 主页A扫闸门显示
     connect(m_paramPage, &ParamPage::gateParamsChanged, this, [this] {
@@ -432,9 +435,11 @@ void MainWindow::wireDriverSignals()
     connect(m_driver, &IDriver::encoderPositionChanged,
             m_calController, &CalibrationController::setEncoderPosition);
 
-    // ── 扫查法则 → CScanEngine ──
+    // ── 扫查法则 → CScanEngine + BScanWidget + DataPacketProcessor ──
     connect(m_driver, &IDriver::scanRulePositionsReady,
             m_cScanEngine, &CScanEngine::setRulePositions);
+    connect(m_driver, &IDriver::scanRulePositionsReady,
+            m_homePage, &HomePage::setBScanRulePositions);
     connect(m_driver, &IDriver::scanRulePositionsReady,
             m_dataProcessor, &DataPacketProcessor::setScanRulePositions);
 

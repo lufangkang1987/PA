@@ -385,7 +385,10 @@ void CTSPA22SDriver::stopAcquisition()
 
     QJsonObject cmd;
     cmd["scan"] = 0;
-    sendJsonCommand(cmd, false);  // scan=0 无 JSON 响应
+    // MFC 在切换法则前会同步接收 scan=0 的 {"result":null}。
+    // 若不消费该响应，下一条 pa_sscan 会误把它当成自己的结果，
+    // 真正的声束位置数组随后被其他命令读走。
+    sendJsonCommand(cmd, true);
 
     m_acquiring = false;
     emit statusChanged(QString::fromUtf8("停止采集"));
@@ -448,19 +451,14 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
         // --- A 扫描：发送当前声束波形 ---
         {
-            int curBeam = qBound(0, m_beamCount / 2, pkt->beamCount - 1);
+            const int curBeam = qBound(0, m_currentBeam, pkt->beamCount - 1);
             const auto &wf = pkt->beams[curBeam];
             QVector<double> wave(WaveSampleCount);
 
-            // 按检波模式归一化：
-            //   RF(3):   uint8->int8 偏移 → [-1.0, +1.0] 双极性
-            //   其他:    uint8 → [0.0, 1.0] 单极性
-            const bool isRF = (m_rectify == 3);
+            // 完全沿用 MFC DrawAView：字节幅值上限为 250，250 对应 100%。
+            // 检波由硬件完成，显示端不再按 RF 模式二次变换。
             for (int i = 0; i < WaveSampleCount; ++i) {
-                if (isRF)
-                    wave[i] = (static_cast<int>(wf.waveP[i]) - 128) / 128.0;
-                else
-                    wave[i] = wf.waveP[i] / 255.0;
+                wave[i] = qMin<int>(wf.waveP[i], 250) / 250.0;
             }
             emit waveformReady(wave, curBeam, wf.frame, m_rectify);
         }
@@ -483,7 +481,7 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
         // --- 闸门读数 ---
         {
-            int curBeam = qBound(0, m_beamCount / 2, pkt->beamCount - 1);
+            const int curBeam = qBound(0, m_currentBeam, pkt->beamCount - 1);
             const auto &wf = pkt->beams[curBeam];
             emit gateReadingsReady('A', wf.amp0, wf.path0);
             emit gateReadingsReady('B', wf.amp1, wf.path1);
@@ -492,7 +490,7 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
 
         // --- 编码器 ---
         {
-            int curBeam = qBound(0, m_beamCount / 2, pkt->beamCount - 1);
+            const int curBeam = qBound(0, m_currentBeam, pkt->beamCount - 1);
             const auto &wf = pkt->beams[curBeam];
             // 正向为主，同时考虑反向
             int pos = static_cast<int>(wf.encFwd) - static_cast<int>(wf.encRvs);
@@ -752,21 +750,30 @@ QJsonObject CTSPA22SDriver::buildScanTypeCommand(int type)
 
     switch (type) {
     case 0: {  // S-Scan
+        QJsonObject probe;
+        probe["elm_num"] = m_probeCount;
+        probe["pitch"] = m_probePitch;
+        QJsonObject aperture;
+        aperture["start_elm"] = qMax(0, m_eleStart - 1);
+        aperture["size"] = m_eleAperture;
+        QJsonObject focus;
+        focus["start_angle"] = m_angleFrom;
+        focus["stop_angle"] = m_angleTo;
+        focus["distance"] = m_focus;
+        QJsonObject workpiece;
+        workpiece["sound_velocity"] = m_velocity;
         QJsonObject sscan;
-        sscan["probe_count"]    = m_probeCount;
-        sscan["probe_freq"]     = m_probeFreq;
-        sscan["probe_pitch"]    = m_probePitch;
-        sscan["ele_start"]      = m_eleStart;
-        sscan["ele_end"]        = m_eleEnd;
-        sscan["ele_aperture"]   = m_eleAperture;
-        sscan["angle_from"]     = m_angleFrom;
-        sscan["angle_to"]       = m_angleTo;
-        sscan["focus"]          = m_focus;
-        sscan["velocity"]       = m_velocity;
-        sscan["wedge_enable"]   = m_wedgeEnable ? 1 : 0;
-        sscan["wedge_angle"]    = m_wedgeAngle;
-        sscan["wedge_velocity"] = m_wedgeVelocity;
-        sscan["wedge_height"]   = m_wedgeHeight;
+        sscan["linear_pa_probe"] = probe;
+        sscan["aperture"] = aperture;
+        sscan["focus"] = focus;
+        sscan["workpiece"] = workpiece;
+        if (m_wedgeEnable) {
+            QJsonObject wedge;
+            wedge["angle"] = m_wedgeAngle;
+            wedge["height"] = m_wedgeHeight;
+            wedge["sound_velocity"] = m_wedgeVelocity;
+            sscan["slope_wedge"] = wedge;
+        }
         cmd["pa_sscan"] = sscan;
         break;
     }
@@ -911,7 +918,8 @@ QJsonObject CTSPA22SDriver::buildRangeCommand(float range)
 void CTSPA22SDriver::setScanType(int type)
 {
     m_scanType = type;
-    if (m_acquiring) {
+    const bool wasAcquiring = m_acquiring;
+    if (wasAcquiring) {
         stopAcquisition();
     }
     const QJsonObject response = sendJsonCommand(buildScanTypeCommand(type), true);
@@ -923,7 +931,7 @@ void CTSPA22SDriver::setScanType(int type)
             positions.append(value.toDouble());
         emit scanRulePositionsReady(positions);
     }
-    if (m_acquiring)
+    if (wasAcquiring)
         startAcquisition();
     emit statusChanged(QString::fromUtf8("扫查类型: %1").arg(
         type == 0 ? QString::fromUtf8("S扫") : type == 1 ? QString::fromUtf8("L扫") : type == 2 ? QString::fromUtf8("CL扫") : "TFM"));

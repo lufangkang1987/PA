@@ -104,9 +104,10 @@ void ParamPage::setBeamNo(int beam)
 {
     if (beam < 0 || beam > 127) return;
     m_params.rx.curBeam = beam;
+    if (m_dispatcher) m_dispatcher->setCurrentBeam(beam);
     if (m_beamNoSpin) {
         m_beamNoSpin->blockSignals(true);
-        m_beamNoSpin->setValue(beam);
+        m_beamNoSpin->setValue(beam + 1);
         m_beamNoSpin->blockSignals(false);
     }
     emit beamInfoChanged(beam, m_params.rx.aGain);

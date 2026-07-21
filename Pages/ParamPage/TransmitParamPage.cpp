@@ -49,6 +49,7 @@ TransmitParamPage::TransmitParamPage(PAParams *params, ParameterDispatcher *disp
     connect(rangeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double v) {
         m_params->tx.range = static_cast<float>(v);
         if (m_dispatcher) m_dispatcher->setRange(static_cast<float>(v));
+        emit rangeChanged(static_cast<float>(v));
     });
     connect(tempCorrectCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params->tx.tempCorrect = v;

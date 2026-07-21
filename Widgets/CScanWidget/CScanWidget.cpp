@@ -3,7 +3,6 @@
 #include "Theme.h"
 #include "ColorMap.h"
 #include <QFontMetrics>
-#include <QtMath>
 #include <QMouseEvent>
 
 
@@ -35,7 +34,7 @@ void CScanWidget::clearData()
     m_dataHeight = 0;
     m_replay     = false;
     m_pageStart  = 0;
-    m_cache = QImage();  // 强制重绘 mock
+    m_cache = QImage();
     update();
 }
 
@@ -82,41 +81,36 @@ void CScanWidget::setImageColumnRange(int first, int last)
 void CScanWidget::rebuildFromData()
 {
     if (m_dataWidth <= 0 || m_dataHeight <= 0 || m_data.size() < m_dataWidth * m_dataHeight) {
-        rebuildMock(QSize(width(), height()));
+        m_cache = QImage();
         return;
     }
 
-    m_cache = QImage(m_dataWidth, m_dataHeight, QImage::Format_RGB32);
-    for (int y = 0; y < m_dataHeight; ++y) {
+    // MFC C scan: horizontal = encoder line, vertical = section column.
+    m_cache = QImage(m_dataHeight, m_dataWidth, QImage::Format_RGB32);
+    for (int y = 0; y < m_dataWidth; ++y) {
         QRgb *line = reinterpret_cast<QRgb *>(m_cache.scanLine(y));
-        for (int x = 0; x < m_dataWidth; ++x) {
+        for (int x = 0; x < m_dataHeight; ++x) {
             // 振幅 0→暗灰(24,30,36), 1→亮白(245,247,249)
-            const float v = qBound(0.0f, m_data[y * m_dataWidth + x], 1.0f);
+            const float v = qBound(0.0f, m_data[x * m_dataWidth + y], 1.0f);
             line[x] = amplitudeToColor(qRound(v * 255.0f));
         }
     }
 }
 
-void CScanWidget::rebuildMock(const QSize &size)
+int CScanWidget::visibleLineCount() const
 {
-    if (size.width() <= 0 || size.height() <= 0) {
-        m_cache = QImage();
-        return;
-    }
+    return hasData() ? qMax(0, qMin(PageLineCount, m_dataHeight - m_pageStart)) : 0;
+}
 
-    m_cache = QImage(size, QImage::Format_RGB32);
-    for (int y = 0; y < size.height(); ++y) {
-        QRgb *line = reinterpret_cast<QRgb *>(m_cache.scanLine(y));
-        for (int x = 0; x < size.width(); ++x) {
-            const double nx = double(x) / qMax(1, size.width());
-            const double ny = double(y) / qMax(1, size.height());
-            int base = int(180 + 32 * qSin(nx * 46.0) + 18 * qSin(ny * 74.0));
-            double flaw = qExp(-qPow((nx - 0.46) / 0.08, 2.0) - qPow((ny - 0.48) / 0.12, 2.0));
-            flaw += 0.5 * qExp(-qPow((nx - 0.32) / 0.045, 2.0) - qPow((ny - 0.34) / 0.055, 2.0));
-            int shade = qBound(24, base - int(flaw * 145.0), 235);
-            line[x] = QColor(shade, shade + 6, shade + 12).rgb();
-        }
-    }
+int CScanWidget::effectiveColumnCount() const
+{
+    return qMax(250, qMax(1, m_imageColumnEnd - m_imageColumnStart));
+}
+
+float CScanWidget::columnToPhysicalMm(int column) const
+{
+    return m_imageStartMm + (m_imageEndMm - m_imageStartMm)
+        * column / float(CScanWidth);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -138,22 +132,24 @@ void CScanWidget::paintEvent(QPaintEvent *)
     // 重建缓存（尺寸变化时）
     const bool hasRealData = hasData();
     if (hasRealData) {
-        if (m_cache.size() != QSize(m_dataWidth, m_dataHeight))
+        if (m_cache.size() != QSize(m_dataHeight, m_dataWidth))
             rebuildFromData();
-    } else {
-        if (plot.size() != m_cache.size())
-            rebuildMock(plot.size());
     }
 
-    // 绘制图像：真实数据拉伸到 plot 区域，mock 数据 1:1
+    p.fillRect(plot, Qt::white);
     if (hasRealData) {
-        const int visibleLines = qMin(PageLineCount, m_dataHeight - m_pageStart);
+        const int visibleLines = visibleLineCount();
         const int visibleColumns = qMax(1, m_imageColumnEnd - m_imageColumnStart);
-        p.drawImage(plot, m_cache,
-                    QRect(m_imageColumnStart, m_pageStart,
-                          visibleColumns, qMax(1, visibleLines)));
-    } else {
-        p.drawImage(plot.topLeft(), m_cache);
+        const int imageHeight = qBound(1,
+            qRound(plot.height() * visibleColumns / float(effectiveColumnCount())),
+            plot.height());
+        const int imageWidth = qBound(1,
+            qRound(plot.width() * visibleLines / float(PageLineCount)),
+            plot.width());
+        const QRect imageRect(plot.left(), plot.top(), imageWidth, imageHeight);
+        p.drawImage(imageRect, m_cache,
+                    QRect(m_pageStart, m_imageColumnStart,
+                          qMax(1, visibleLines), visibleColumns));
     }
 
     // 网格
@@ -170,24 +166,42 @@ void CScanWidget::paintEvent(QPaintEvent *)
     const QFontMetrics afm(axisFont);
     p.setPen(QColor(210, 222, 232));
 
-    // Y 轴刻度
-    const int visibleLines = hasRealData ? qMin(PageLineCount, m_dataHeight - m_pageStart) : 0;
-    const QString yTopStr = hasRealData
-        ? QString::number(m_pageStart * m_scanStepMm, 'f', 1) : "0";
-    const QString yBotStr = hasRealData
-        ? QString::number((m_pageStart + visibleLines) * m_scanStepMm, 'f', 1) : "400";
-    const int yTopW = afm.horizontalAdvance(yTopStr);
-    const int yBotW = afm.horizontalAdvance(yBotStr);
-    p.drawText(qMax(0, ml - yTopW - 2), plot.top() + afm.ascent(), yTopStr);
-    p.drawText(qMax(0, ml - yBotW - 2), plot.bottom(), yBotStr);
+    const int visibleLines = visibleLineCount();
+    // MFC: physical span starts at LineX1/512 and uses at least 250/512.
+    for (int i = 0; i <= 4; ++i) {
+        const int column = m_imageColumnStart + effectiveColumnCount() * i / 4;
+        const QString text = QString::number(columnToPhysicalMm(column), 'f', 1);
+        const int y = plot.top() + plot.height() * i / 4;
+        p.drawLine(plot.left() - (i % 2 ? 4 : 7), y, plot.left(), y);
+        p.drawText(qMax(0, ml - afm.horizontalAdvance(text) - 3),
+                   qBound(plot.top() + afm.ascent(), y + afm.ascent() / 2,
+                          plot.bottom()), text);
+    }
 
     // X 轴标签
     const QString xLabel = hasRealData
-        ? QString("X %1-%2 mm").arg(m_imageStartMm, 0, 'f', 1).arg(m_imageEndMm, 0, 'f', 1) : QString("X(mm)");
+        ? QString("X %1-%2 mm")
+              .arg(m_pageStart * m_scanStepMm, 0, 'f', 1)
+              .arg((m_pageStart + qMax(0, visibleLines - 1)) * m_scanStepMm, 0, 'f', 1)
+        : QString("X(mm)");
     const int xLabelW = afm.horizontalAdvance(xLabel);
     const int xLabelX = qBound(plot.left(), plot.center().x() - xLabelW / 2,
                                plot.right() - xLabelW);
     p.drawText(xLabelX, height() - 4, xLabel);
+
+    if (hasRealData && visibleLines > 0) {
+        const int firstMinor = ((m_pageStart + 19) / 20) * 20;
+        for (int line = firstMinor; line < m_pageStart + visibleLines; line += 20) {
+            const int x = plot.left() + qRound((line - m_pageStart)
+                                               * plot.width() / float(PageLineCount));
+            const bool major = (line % 100) == 0;
+            p.drawLine(x, plot.bottom(), x, plot.bottom() + (major ? 7 : 4));
+            if (major) {
+                const QString text = QString::number(line * m_scanStepMm, 'f', 0);
+                p.drawText(x + 2, plot.bottom() + afm.height() + 2, text);
+            }
+        }
+    }
 
     // Y 轴标签 (旋转)
     const QString yLabel = hasRealData
@@ -222,19 +236,19 @@ void CScanWidget::paintEvent(QPaintEvent *)
 
     if (hasRealData && m_selectedLine >= 0) {
         if (m_selectedLine >= m_pageStart && m_selectedLine < m_pageStart + visibleLines) {
-            const int y = plot.top() + qRound((m_selectedLine - m_pageStart + 0.5)
-                                              * plot.height() / qMax(1, visibleLines));
+            const int x = plot.left() + qRound((m_selectedLine - m_pageStart + 0.5)
+                                               * plot.width() / float(PageLineCount));
             p.setPen(QPen(QColor(255, 190, 0), 1));
-            p.drawLine(plot.left(), y, plot.right(), y);
+            p.drawLine(x, plot.top(), x, plot.bottom());
         }
     }
 
     if (hasRealData) {
-        const int visibleColumns = qMax(1, m_imageColumnEnd - m_imageColumnStart);
-        const int left = plot.left() + qRound(m_analysisColumn1 * plot.width() / float(visibleColumns));
-        const int right = plot.left() + qRound((m_analysisColumn2 + 1) * plot.width() / float(visibleColumns));
-        const int top = plot.top() + qRound(m_analysisLine1 * plot.height() / float(qMax(1, visibleLines)));
-        const int bottom = plot.top() + qRound((m_analysisLine2 + 1) * plot.height() / float(qMax(1, visibleLines)));
+        const int visibleColumns = effectiveColumnCount();
+        const int left = plot.left() + qRound(m_analysisLine1 * plot.width() / float(PageLineCount));
+        const int right = plot.left() + qRound((m_analysisLine2 + 1) * plot.width() / float(PageLineCount));
+        const int top = plot.top() + qRound(m_analysisColumn1 * plot.height() / float(visibleColumns));
+        const int bottom = plot.top() + qRound((m_analysisColumn2 + 1) * plot.height() / float(visibleColumns));
         p.setPen(QPen(QColor(0, 255, 80), 1));
         p.drawRect(QRect(QPoint(left, top), QPoint(right, bottom)).normalized());
     }
@@ -250,14 +264,15 @@ void CScanWidget::mousePressEvent(QMouseEvent *event)
     const QRect plot = rect().adjusted(ml, mt, -mr, -mb);
     if (!plot.contains(event->position().toPoint())) return;
 
-    const int visibleLines = qMin(PageLineCount, m_dataHeight - m_pageStart);
-    const int localLine = qBound(0, int((event->position().y() - plot.top())
-        * visibleLines / qMax(1, plot.height())), qMax(0, visibleLines - 1));
+    const int visibleLines = visibleLineCount();
+    const int localLine = int((event->position().x() - plot.left())
+        * PageLineCount / qMax(1, plot.width()));
+    if (localLine < 0 || localLine >= visibleLines) return;
     const int line = m_pageStart + localLine;
-    const int visibleColumns = qMax(1, m_imageColumnEnd - m_imageColumnStart);
-    const int localColumn = qBound(0, int((event->position().x() - plot.left())
-        * visibleColumns / qMax(1, plot.width())), visibleColumns - 1);
-    const int column = m_imageColumnStart + localColumn;
+    const int visibleColumns = effectiveColumnCount();
+    const int localColumn = qBound(0, int((event->position().y() - plot.top())
+        * visibleColumns / qMax(1, plot.height())), visibleColumns - 1);
+    const int column = qMin(m_imageColumnEnd - 1, m_imageColumnStart + localColumn);
     setSelectedLine(line);
     emit positionSelected(line, column);
 

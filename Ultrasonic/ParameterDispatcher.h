@@ -27,6 +27,7 @@ public:
     void setPulseWidth(int width);
     void setPRF(int prf);
     void setRange(float range);
+    void setCurrentBeam(int beam);
     void setRectify(int mode);
     void setFilter(int filter);
     void setADataLen(int len);

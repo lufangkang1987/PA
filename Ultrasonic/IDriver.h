@@ -33,6 +33,7 @@ public:
     virtual void setPulseWidth(int width) = 0;
     virtual void setPRF(int prf) = 0;
     virtual void setRange(float range) = 0;
+    virtual void setCurrentBeam(int beam) = 0;
     virtual void setRectify(int mode) = 0;
     virtual void setFilter(int filter) = 0;
     virtual void setADataLen(int len) = 0;

@@ -107,7 +107,8 @@ void Logger::rotateIfNeeded(qint64 incomingBytes)
     }
     QFile::rename(g_path, g_path + QStringLiteral(".1"));
     g_file.setFileName(g_path);
-    g_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+    if (!g_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+        return;
 }
 
 void Logger::write(QtMsgType type, const char *category, const QString &message,

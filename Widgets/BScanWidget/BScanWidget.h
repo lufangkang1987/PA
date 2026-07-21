@@ -28,6 +28,8 @@ public:
     // Kept for source compatibility. When a PAParams source is bound, it is the authority.
     void setAcousticParams(float velocity, float range, int sampleRate);
 
+    void setRulePositions(const QVector<double> &positions);
+
     void setFrozen(bool frozen);
     bool isFrozen() const { return m_frozen; }
 
@@ -58,6 +60,9 @@ private:
     std::vector<uint8_t> m_sImage;
     QImage m_displayImage;
     ScanRule m_rules[MaxBeams];
+    float m_imgSpanStart = 0.0f;
+    float m_imgSpanEnd = 0.0f;
+    QVector<double> m_rulePositions;
     ScanConfig m_scan;
     const PAParams *m_params = nullptr;
 

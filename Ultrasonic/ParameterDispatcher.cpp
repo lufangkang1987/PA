@@ -56,6 +56,11 @@ void ParameterDispatcher::setRange(float range)
     if (m_driver) m_driver->setRange(range);
 }
 
+void ParameterDispatcher::setCurrentBeam(int beam)
+{
+    if (m_driver) m_driver->setCurrentBeam(beam);
+}
+
 void ParameterDispatcher::setRectify(int mode)
 {
     if (m_driver) m_driver->setRectify(mode);
@@ -129,6 +134,7 @@ void ParameterDispatcher::applyLaw(const PAParams &params)
     m_driver->setPulseWidth(params.tx.pulseWidth);
     m_driver->setPRF(params.tx.prf);
     m_driver->setRange(params.tx.range);
+    m_driver->setCurrentBeam(params.rx.curBeam);
     m_driver->setRectify(params.rx.rectify);
     m_driver->setFilter(params.rx.filter);
     m_driver->setADataLen(params.tx.aDataLen);

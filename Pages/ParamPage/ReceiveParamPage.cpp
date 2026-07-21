@@ -20,7 +20,8 @@ ReceiveParamPage::ReceiveParamPage(PAParams *params, ParameterDispatcher *dispat
     dGainSpin = makeParamDoubleSpin(-12.0, 12.0, m_params->rx.dGain, 0.1, "dB");
     f->addRow(QString::fromUtf8("数字增益"), wrapWithStepSelector(dGainSpin, {"0.1", "1.0", "6.0"}, {0.1, 1.0, 6.0}, 1));
 
-    beamNoSpin = makeParamIntSpin(0, 127, m_params->rx.curBeam, 1);
+    // 界面沿用 MFC 的 1~128 编号；内部及设备数据仍使用 0~127 下标。
+    beamNoSpin = makeParamIntSpin(1, 128, m_params->rx.curBeam + 1, 1);
     f->addRow(QString::fromUtf8("声束号"), wrapWithStepSelector(beamNoSpin, {"1", "10"}, {1.0, 10.0}, 0));
 
     rectifyCombo = makeParamCombo({QString::fromUtf8("全波"), QString::fromUtf8("正半波"), QString::fromUtf8("负半波")}, m_params->rx.rectify);
@@ -47,8 +48,10 @@ ReceiveParamPage::ReceiveParamPage(PAParams *params, ParameterDispatcher *dispat
         if (m_dispatcher) m_dispatcher->setDigitalGain(static_cast<float>(v));
     });
     connect(beamNoSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int v) {
-        m_params->rx.curBeam = v;
-        emit beamInfoChanged(v, m_params->rx.aGain);
+        const int beamIndex = v - 1;
+        m_params->rx.curBeam = beamIndex;
+        if (m_dispatcher) m_dispatcher->setCurrentBeam(beamIndex);
+        emit beamInfoChanged(beamIndex, m_params->rx.aGain);
     });
     connect(rectifyCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int v) {
         m_params->rx.rectify = v;

@@ -106,6 +106,7 @@ public:
     void setPulseWidth(int width) override;
     void setPRF(int prf) override;
     void setRange(float range) override;
+    void setCurrentBeam(int beam) override { m_currentBeam = qBound(0, beam, MaxBeams - 1); }
     void setRectify(int mode) override;
     void setFilter(int filter) override;
     void setADataLen(int len) override;
@@ -173,6 +174,7 @@ private:
     bool         m_dataReady   = false;
     int          m_scanType    = 0;
     int          m_beamCount   = 128;
+    int          m_currentBeam  = 0;
     bool         m_hasLastWaveFrame = false;
     quint16      m_lastWaveFrame = 0;
     int          m_lastReportedFrameDiff = -1;

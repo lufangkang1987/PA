@@ -66,7 +66,20 @@ void BScanWidget::computeScanRules(int beamCount)
         return;
     }
 
-    ::computeScanRules(*scan, *probe, range, count, nullptr, nullptr, m_rules);
+    ::computeScanRules(*scan, *probe, range, count,
+                       m_rulePositions.size() >= count ? &m_rulePositions : nullptr,
+                       nullptr, m_rules, &m_imgSpanStart, &m_imgSpanEnd);
+}
+
+void BScanWidget::setRulePositions(const QVector<double> &positions)
+{
+    m_rulePositions = positions.mid(0, MaxBeams);
+    const int configuredCount = m_params ? m_params->global.beamCount : m_scan.beamCount;
+    const int effectiveCount = m_rulePositions.isEmpty()
+        ? configuredCount : qMin(configuredCount, m_rulePositions.size());
+    computeScanRules(effectiveCount);
+    m_displayImage = buildDisplayImage();
+    update();
 }
 
 void BScanWidget::softwareImaging(
@@ -113,7 +126,11 @@ void BScanWidget::setMultiBeamData(const QVector<QVector<double>> &waves, bool i
 
     const int beamCount = waves.size();
     if (beamCount < 1) return;
-    const int effectiveBeamCount = qMin(beamCount, MaxBeams);
+    // MFC 使用设备规则对应的实际声束数。数据包的存储槽可能仍为128，
+    // 不能因此丢弃数量较少的有效规则，否则会退回55..455的宽顶假扇形。
+    int effectiveBeamCount = qMin(beamCount, MaxBeams);
+    if (!m_rulePositions.isEmpty())
+        effectiveBeamCount = qMin(effectiveBeamCount, m_rulePositions.size());
 
     computeScanRules(effectiveBeamCount);
 
@@ -172,12 +189,28 @@ void BScanWidget::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.fillRect(rect(), ThemeColor::DeepBg);
 
-    const int ml = qMin(46, qMax(18, width() / 9));
-    const int mt = qMin(14, qMax(6,  height() / 24));
+    const int ml = qMin(62, qMax(48, width() / 9));
+    const int mt = qMin(38, qMax(30, height() / 10));
     const int mr = qMin(50, qMax(22, width() / 8));
-    const int mb = qMin(30, qMax(14, height() / 12));
-    const QRect plot = rect().adjusted(ml, mt, -mr, -mb);
+    const int mb = qMin(18, qMax(8, height() / 20));
+    QRect plot = rect().adjusted(ml, mt, -mr, -mb);
     if (plot.width() <= 0 || plot.height() <= 0) return;
+
+    // MFC renders the 512 x 400 software-imaging buffer at almost its native
+    // aspect ratio (about 1.28).  Stretching it to the whole Qt panel makes
+    // the sector roughly 15-20% wider on the current wide layout.  Keep the
+    // same imaging aspect ratio and make the rulers describe that exact area.
+    constexpr double imageAspect = double(CScanWidth) / WaveSampleCount;
+    const int aspectWidth = qRound(plot.height() * imageAspect);
+    if (aspectWidth < plot.width()) {
+        const int left = plot.left() + (plot.width() - aspectWidth) / 2;
+        plot.setLeft(left);
+        plot.setWidth(aspectWidth);
+    } else {
+        const int aspectHeight = qRound(plot.width() / imageAspect);
+        if (aspectHeight < plot.height())
+            plot.setHeight(aspectHeight);
+    }
 
     if (!m_displayImage.isNull()) {
         p.setRenderHint(QPainter::SmoothPixmapTransform, false);
@@ -190,27 +223,47 @@ void BScanWidget::paintEvent(QPaintEvent *)
     p.setPen(QColor(210, 222, 232));
 
     const float displayRange = m_params ? m_params->tx.range : m_scan.range;
-    const QString yTopStr = "0";
-    const QString yBotStr = QString::number(static_cast<int>(displayRange), 'f', 0);
-    p.drawText(qMax(0, ml - afm.horizontalAdvance(yTopStr) - 2),
-               plot.top() + afm.ascent(), yTopStr);
-    p.drawText(qMax(0, ml - afm.horizontalAdvance(yBotStr) - 2),
-               plot.bottom(), yBotStr);
 
-    const QString xLabel = QString::fromUtf8("位置(mm)");
-    const int xLabelW = afm.horizontalAdvance(xLabel);
-    p.drawText(qBound(plot.left(), plot.center().x() - xLabelW / 2,
-                      plot.right() - xLabelW),
-               height() - 4, xLabel);
-
-    const QString yLabel = QString::fromUtf8("深度(mm)");
-    const int yLabelW = afm.horizontalAdvance(yLabel);
+    // MFC B_RulerLeft：5组主刻度数值、50组小刻度，量程数值保留1位小数。
+    for (int i = 0; i < 50; ++i) {
+        const int y = plot.top() + qRound(double(i) * plot.height() / 50.0);
+        const bool major = (i % 10) == 0;
+        p.drawLine(plot.left() - (major ? 10 : 5), y, plot.left(), y);
+    }
+    for (int i = 0; i < 5; ++i) {
+        const double y = plot.top() + double(i) * plot.height() / 5.0;
+        const QString text = QString::number(displayRange * i / 5.0f, 'f', 1);
+        p.drawText(QPointF(plot.left() - 13 - afm.horizontalAdvance(text),
+                           y + afm.ascent() / 2.0), text);
+    }
     p.save();
-    const int yLabelX = qMax(2, (ml - afm.height()) / 2 + 2);
-    p.translate(yLabelX, plot.center().y() + yLabelW / 2);
+    const QString yUnit = QStringLiteral("mm");
+    p.translate(9, plot.bottom() - afm.horizontalAdvance(yUnit));
     p.rotate(-90);
-    p.drawText(0, 0, yLabel);
+    p.drawText(0, 0, yUnit);
     p.restore();
+
+    // MFC B_RulerTop：扫描类型、10组主刻度、50组小刻度和5组物理坐标。
+    const int scanType = m_params ? m_params->scan.scanType : m_scan.scanType;
+    const QString scanName = scanType == 0 ? QStringLiteral("S")
+                           : scanType == 1 ? QStringLiteral("L")
+                                           : QStringLiteral("CL");
+    p.drawText(plot.left() - afm.horizontalAdvance(scanName) - 8,
+               plot.top() - 14, scanName);
+    for (int i = 0; i < 50; ++i) {
+        const int x = plot.left() + qRound(double(i) * plot.width() / 50.0);
+        const bool major = (i % 5) == 0;
+        p.drawLine(x, plot.top() - (major ? 10 : 5), x, plot.top());
+    }
+    for (int i = 0; i < 5; ++i) {
+        const double x = plot.left() + double(i) * plot.width() / 5.0;
+        const double value = m_imgSpanStart
+                           + (m_imgSpanEnd - m_imgSpanStart) * i / 5.0;
+        const QString text = QString::number(value, 'f', 1);
+        p.drawText(QPointF(x, plot.top() - 14), text);
+    }
+    const QString xUnit = scanType < 2 ? QStringLiteral("mm") : QString::fromUtf8("°");
+    p.drawText(plot.right() - afm.horizontalAdvance(xUnit), plot.top() - 14, xUnit);
 
     const int scaleGap = qMin(14, qMax(4, mr / 3));
     const int scaleW = qMin(11, qMax(6, mr / 4));

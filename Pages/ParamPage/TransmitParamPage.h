@@ -21,6 +21,9 @@ public:
     QComboBox *tempCorrectCombo = nullptr;
     QComboBox *aDataLenCombo = nullptr;
 
+signals:
+    void rangeChanged(float rangeMm);
+
 private:
     PAParams *m_params = nullptr;
     ParameterDispatcher *m_dispatcher = nullptr;

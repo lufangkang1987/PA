@@ -268,8 +268,12 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 void HomePage::setAScanWaveform(const QVector<double> &data, int beamIndex,
                                  int frameIndex, int rectifyMode)
 {
-    if (m_aScan)
+    if (m_aScan) {
+        if (m_paramsSource)
+            m_aScan->setAcousticParams(float(m_paramsSource->wp.lVelocity),
+                                       100, m_paramsSource->tx.range);
         m_aScan->setWaveform(data, beamIndex, frameIndex, rectifyMode);
+    }
 }
 
 void HomePage::setBScanWaveforms(const QVector<QVector<double>> &waves)
@@ -283,8 +287,17 @@ void HomePage::setBScanWaveforms(const QVector<QVector<double>> &waves)
         m_aScan->setAlarm(alarm);
 }
 
+void HomePage::setBScanRulePositions(const QVector<double> &positions)
+{
+    if (m_bScan)
+        m_bScan->setRulePositions(positions);
+}
+
 void HomePage::bindParams(const PAParams *params)
 {
+	m_paramsSource = params;
+	if (m_aScan && params)
+		m_aScan->setAcousticParams(float(params->wp.lVelocity), 100, params->tx.range);
 	if (m_bScan)
 		m_bScan->setParamsSource(params);
 }
@@ -376,19 +389,21 @@ void HomePage::showReplayPacket(const DataPacket &packet, int line,
                                 int beamIndex, int rectifyMode)
 {
     if (packet.beamCount <= 0) return;
+    if (m_aScan && m_paramsSource)
+        m_aScan->setAcousticParams(float(m_paramsSource->wp.lVelocity),
+                                   100, m_paramsSource->tx.range);
     const int beam = qBound(0, beamIndex, packet.beamCount - 1);
-    const bool isRf = rectifyMode == 3;
     QVector<double> selected(WaveSampleCount);
     QVector<QVector<double>> all(packet.beamCount);
     for (int b = 0; b < packet.beamCount; ++b) {
         all[b].resize(WaveSampleCount);
         for (int i = 0; i < WaveSampleCount; ++i)
-            all[b][i] = isRf ? (int(packet.beams[b].waveP[i]) - 128) / 128.0
-                             : packet.beams[b].waveP[i] / 255.0;
+            all[b][i] = packet.beams[b].waveP[i] / 255.0;
     }
-    selected = all[beam];
+    for (int i = 0; i < WaveSampleCount; ++i)
+        selected[i] = qMin<int>(packet.beams[beam].waveP[i], 250) / 250.0;
     m_aScan->setWaveform(selected, beam, packet.frameIndex, rectifyMode);
-    m_bScan->setMultiBeamData(all, isRf);
+    m_bScan->setMultiBeamData(all, false);
     m_cScan->setSelectedLine(line);
 }
 

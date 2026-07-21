@@ -8,9 +8,6 @@
 void ParamPage::buildTcgPage()
 {
     m_tcgPage = new TcgParamPage(&m_params, this);
-    m_calibrationBtn = m_tcgPage->calibrationBtn;
-    connect(m_tcgPage, &TcgParamPage::calibrationRequested,
-            this, &ParamPage::calibrationRequested);
     m_stack->addWidget(m_tcgPage);
 }
 

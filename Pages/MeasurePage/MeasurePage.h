@@ -38,10 +38,12 @@ private:
     ReadingItem *m_gateAPathReading;
     ReadingItem *m_gateBAmpReading;
     ReadingItem *m_gateBPathReading;
-    ReadingItem *m_aHorizontalReading;
-    ReadingItem *m_aVerticalReading;
-    ReadingItem *m_bHorizontalReading;
-    ReadingItem *m_bVerticalReading;
+    ReadingItem *m_gateCAmpReading;
+	ReadingItem *m_gateCPathReading;
+    //ReadingItem *m_aHorizontalReading;
+    //ReadingItem *m_aVerticalReading;
+    //ReadingItem *m_bHorizontalReading;
+    //ReadingItem *m_bVerticalReading;
 
     // ── 按钮 ──
     QPushButton *m_freezeBtn;

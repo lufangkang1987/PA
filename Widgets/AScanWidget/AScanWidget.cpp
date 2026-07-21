@@ -22,6 +22,7 @@ void AScanWidget::setAcousticParams(float velocity, int sampleRate, float range)
     m_velocity   = velocity;
     m_sampleRate = sampleRate;
     m_userRange  = range;
+    update();
 }
 
 void AScanWidget::setWaveform(const QVector<double> &data,
@@ -122,8 +123,8 @@ void AScanWidget::paintEvent(QPaintEvent *)
         const int x = plot.left() + i * plot.width() / 5;
         p.drawLine(x, plot.top(), x, plot.bottom());
     }
-    for (int i = 1; i < 8; ++i) {   // 横线：深度均匀
-        const int y = plot.top() + i * plot.height() / 8;
+    for (int i = 1; i < 10; ++i) {   // 与 MFC 一致：声程方向 10 等分
+        const int y = plot.top() + i * plot.height() / 10;
         p.drawLine(plot.left(), y, plot.right(), y);
     }
 
@@ -194,7 +195,8 @@ void AScanWidget::paintEvent(QPaintEvent *)
     if (m_isLive && N >= 2) {
         QPainterPath path;
         const double ampW = plot.width();              // 100% 幅度 = 全宽
-        const double yScale = double(plot.height()) / double(N - 1);
+        // MFC 在 400 高逻辑画布上使用 y=i，最后一个采样点位于 399。
+        const double yScale = double(plot.height()) / 400.0;
 
         auto clampA = [](double v) { return qBound(0.0, v, 1.0); };
 
@@ -244,7 +246,7 @@ void AScanWidget::paintEvent(QPaintEvent *)
         static const char *modes[] = {"QW", "ZW", "FW", "RF"};
         const char *mn = (m_rectifyMode >= 0 && m_rectifyMode <= 3) ? modes[m_rectifyMode] : "??";
         QString txt = QString("Beam %1  Frame %2  %3  %.1fmm  %4 FPS")
-            .arg(m_beamIndex).arg(m_frameIndex).arg(mn).arg(totalMm, 0, 'f', 1).arg(m_currentFps, 0, 'f', 1);
+            .arg(m_beamIndex + 1).arg(m_frameIndex).arg(mn).arg(totalMm, 0, 'f', 1).arg(m_currentFps, 0, 'f', 1);
         p.setPen(m_isLive ? QColor(0, 220, 50, 200) : QColor(80, 100, 80, 150));
         p.drawText(plot.right() - hm.horizontalAdvance(txt) - 4,
                    plot.top() + 12, txt);
@@ -356,4 +358,3 @@ void AScanWidget::mouseReleaseEvent(QMouseEvent *ev)
     }
     QWidget::mouseReleaseEvent(ev);
 }
-

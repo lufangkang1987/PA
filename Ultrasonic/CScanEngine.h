@@ -62,6 +62,7 @@ private:
     int m_lastMetricLines = 0;
     int m_traceBaseB = 0;
     int m_traceBaseC = 0;
+    bool m_traceBaseInitialized = false;
     int m_shiftA1[MaxBeams] = {};
     int m_shiftA2[MaxBeams] = {};
     QVector<double> m_rulePositions;

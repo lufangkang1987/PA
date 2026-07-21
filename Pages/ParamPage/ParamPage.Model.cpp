@@ -1,6 +1,7 @@
 ﻿#include "ParamPage.h"
 #include "ParamPageUiHelpers.h"
 #include "ParameterDispatcher.h"
+#include "TcgParamPage.h"
 
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -396,7 +397,7 @@ void ParamPage::syncUiFromParams()
     // ── 接收 ──
     m_aGainSpin->setValue(static_cast<double>(p.rx.aGain));
     m_dGainSpin->setValue(static_cast<double>(p.rx.dGain));
-    m_beamNoSpin->setValue(p.rx.curBeam);
+    m_beamNoSpin->setValue(p.rx.curBeam + 1);
     m_rectifyCombo->setCurrentIndex(p.rx.rectify);
     m_filterCombo->setCurrentIndex(p.rx.filter);
     m_videoCombo->setCurrentIndex(p.rx.video);
@@ -436,6 +437,9 @@ void ParamPage::syncUiFromParams()
         m_scanTypeCombo->blockSignals(false);
     }
     onScanTypeChanged(p.scan.scanType);
+
+    if (m_tcgPage)
+        m_tcgPage->syncFromParams();
 
     // 通知闸门同步
     emit gateParamsChanged();

@@ -108,6 +108,7 @@ signals:
     void calibrationRequested(int item);
     void encoderCalibrationRequested();
     void cScanViewParamsChanged();
+    void rangeChanged(float rangeMm);
 
 private:
     QListWidget   *m_nav      = nullptr;

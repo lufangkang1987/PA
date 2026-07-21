@@ -68,6 +68,7 @@ public:
 	void setAScanWaveform(const QVector<double> &data, int beamIndex,
 	                      int frameIndex, int rectifyMode);
 	void setBScanWaveforms(const QVector<QVector<double>> &waves);
+	void setBScanRulePositions(const QVector<double> &positions);
 	void updateFrameStatistics(int frameDiff, quint64 droppedFrames);
 
 	// 闸门可视化
@@ -101,6 +102,7 @@ signals:
 	void cScanAnalysisMeasured(float maximum, float average, int maxLine, int maxColumn);
 
 private:
+	const PAParams* m_paramsSource = nullptr;
 	AScanWidget* m_aScan;
 	BScanWidget* m_bScan;
 	CScanWidget* m_cScan;

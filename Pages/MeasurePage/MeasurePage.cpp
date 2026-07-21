@@ -17,16 +17,18 @@ MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
     layout->setSpacing(4);
 
     // ── 读数项 ──
-    m_beamReading       = new ReadingItem(QString::fromUtf8("声束号"),   "",   "0",    "#f2fbff");
-    m_gainReading       = new ReadingItem(QString::fromUtf8("模拟增益"), "dB", "18.0", "#f2fbff");
-    m_gateAAmpReading   = new ReadingItem(QString::fromUtf8("A门幅度"),  "%",  "--",   "#ff4444");
-    m_gateAPathReading  = new ReadingItem(QString::fromUtf8("A门声程"),  "mm", "--",   "#f2fbff");
-    m_gateBAmpReading   = new ReadingItem(QString::fromUtf8("B门幅度"),  "%",  "--",   "#1eea36");
-    m_gateBPathReading  = new ReadingItem(QString::fromUtf8("B门声程"),  "mm", "--",   "#f2fbff");
-    m_aHorizontalReading = new ReadingItem(QString::fromUtf8("A水平"),   "mm", "--",   "#1eea36");
-    m_aVerticalReading  = new ReadingItem(QString::fromUtf8("A垂直"),    "mm", "--",   "#1eea36");
-    m_bHorizontalReading = new ReadingItem(QString::fromUtf8("B水平"),   "mm", "--",   "#1eea36");
-    m_bVerticalReading  = new ReadingItem(QString::fromUtf8("B垂直"),    "mm", "--",   "#1eea36");
+	m_beamReading = new ReadingItem(QString::fromUtf8("声束号"), "", "1", "#f2fbff");
+	m_gainReading = new ReadingItem(QString::fromUtf8("模拟增益"), "dB", "18.0", "#f2fbff");
+	m_gateAAmpReading = new ReadingItem(QString::fromUtf8("A门幅度"), "%", "--", "#ff4444");
+	m_gateAPathReading = new ReadingItem(QString::fromUtf8("A门声程"), "mm", "--", "#f2fbff");
+	m_gateBAmpReading = new ReadingItem(QString::fromUtf8("B门幅度"), "%", "--", "#ffc800");
+	m_gateBPathReading = new ReadingItem(QString::fromUtf8("B门声程"), "mm", "--", "#f2fbff");
+	m_gateCAmpReading = new ReadingItem(QString::fromUtf8("C门幅度"), "%", "--", "#c832ff");
+	m_gateCPathReading = new ReadingItem(QString::fromUtf8("C门声程"), "mm", "--", "#f2fbff");
+    //m_aHorizontalReading = new ReadingItem(QString::fromUtf8("A水平"),   "mm", "--",   "#1eea36");
+    //m_aVerticalReading  = new ReadingItem(QString::fromUtf8("A垂直"),    "mm", "--",   "#1eea36");
+    //m_bHorizontalReading = new ReadingItem(QString::fromUtf8("B水平"),   "mm", "--",   "#1eea36");
+    //m_bVerticalReading  = new ReadingItem(QString::fromUtf8("B垂直"),    "mm", "--",   "#1eea36");
 
     layout->addWidget(m_beamReading);
     layout->addWidget(m_gainReading);
@@ -40,16 +42,18 @@ MeasurePage::MeasurePage(QWidget *parent) : QFrame(parent)
     layout->addWidget(m_gateAPathReading);
     layout->addWidget(m_gateBAmpReading);
     layout->addWidget(m_gateBPathReading);
+	layout->addWidget(m_gateCAmpReading);
+	layout->addWidget(m_gateCPathReading);
 
     auto *sep2 = new QFrame;
     sep2->setObjectName("ReadingSep");
     sep2->setFixedHeight(1);
     layout->addWidget(sep2);
 
-    layout->addWidget(m_aHorizontalReading);
-    layout->addWidget(m_aVerticalReading);
-    layout->addWidget(m_bHorizontalReading);
-    layout->addWidget(m_bVerticalReading);
+    //layout->addWidget(m_aHorizontalReading);
+    //layout->addWidget(m_aVerticalReading);
+    //layout->addWidget(m_bHorizontalReading);
+    //layout->addWidget(m_bVerticalReading);
 
     layout->addStretch();
 
@@ -156,20 +160,20 @@ void MeasurePage::updateGateReadings(char gate, double amplitudePercent, double 
         m_gateAAmpReading->setValue(amplitudePercent, 1);
         m_gateAPathReading->setValue(soundPathMm, 1);
         // 水平/垂直：需配合编码器+闸门触发逻辑，暂无数据
-        m_aHorizontalReading->setValue(horizontal, 1);
-        m_aVerticalReading->setValue(vertical, 1);
+        //m_aHorizontalReading->setValue(horizontal, 1);
+        //m_aVerticalReading->setValue(vertical, 1);
     } else if (gate == 'B') {
         m_gateBAmpReading->setValue(amplitudePercent, 1);
         m_gateBPathReading->setValue(soundPathMm, 1);
-        m_bHorizontalReading->setValue(horizontal, 1);
-        m_bVerticalReading->setValue(vertical, 1);
+        //m_bHorizontalReading->setValue(horizontal, 1);
+        //m_bVerticalReading->setValue(vertical, 1);
     }
     // Gate C: 耦合监视闸门，右侧面板不显示读数
 }
 
 void MeasurePage::updateBeamInfo(int beamNo, double gain)
 {
-    m_beamReading->setValue(QString::number(beamNo));
+    m_beamReading->setValue(QString::number(beamNo + 1));
     m_gainReading->setValue(gain, 1);
 }
 

@@ -70,6 +70,7 @@ public:
 	void setBScanWaveforms(const QVector<QVector<double>> &waves);
 	void setBScanRulePositions(const QVector<double> &positions);
 	void updateFrameStatistics(int frameDiff, quint64 droppedFrames);
+	void updateBeamInfo(int beamIndex, double gainDb);
 
 	// 闸门可视化
 	void setGateParams(int gate, bool enabled, float start, float width,
@@ -103,9 +104,12 @@ signals:
 
 private:
 	const PAParams* m_paramsSource = nullptr;
+	float m_lastBScanRange = -1.0f;
 	AScanWidget* m_aScan;
 	BScanWidget* m_bScan;
 	CScanWidget* m_cScan;
+	ElidedLabel* m_aScanMeta = nullptr;
+	ElidedLabel* m_bScanMeta = nullptr;
 	ElidedLabel* m_scanLengthStatus = nullptr;
 	ElidedLabel* m_scannedLengthStatus = nullptr;
 	ElidedLabel* m_progressStatus = nullptr;

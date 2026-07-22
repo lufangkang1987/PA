@@ -15,6 +15,11 @@ BScanWidget::BScanWidget(QWidget *parent) : QWidget(parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     m_sImage.resize(SImageSize, 0xFF);
+    m_mapBeam0.resize(SImageSize, 0xFF);
+    m_mapBeam1.resize(SImageSize, 0xFF);
+    m_mapSample0.resize(SImageSize);
+    m_mapSample1.resize(SImageSize);
+    m_mapBlend.resize(SImageSize);
     buildColorLUT();
     m_displayImage = buildDisplayImage();
 }
@@ -63,12 +68,57 @@ void BScanWidget::computeScanRules(int beamCount)
 
     if (scan->scanType == 3) {
         std::fill_n(m_rules, MaxBeams, ScanRule{});
+        m_ruleBeamCount = count;
+        rebuildImagingMap(0);
         return;
     }
 
     ::computeScanRules(*scan, *probe, range, count,
                        m_rulePositions.size() >= count ? &m_rulePositions : nullptr,
                        nullptr, m_rules, &m_imgSpanStart, &m_imgSpanEnd);
+    m_ruleBeamCount = count;
+    rebuildImagingMap(count);
+}
+
+void BScanWidget::rebuildImagingMap(int beamCount)
+{
+    std::fill(m_mapBeam0.begin(), m_mapBeam0.end(), quint8(0xFF));
+    if (beamCount < 2) return;
+
+    double cosA[MaxBeams], sinA[MaxBeams];
+    for (int b = 0; b < beamCount; ++b) {
+        const double rad = qDegreesToRadians(double(m_rules[b].ang));
+        cosA[b] = std::cos(rad);
+        sinA[b] = std::sin(rad);
+    }
+
+    int outIndex = 0;
+    for (int y = WaveSampleCount - 1; y >= 0; --y) {
+        int b = 0;
+        for (int x = 0; x < CScanWidth; ++x, ++outIndex) {
+            double x1 = 0.0;
+            for (; b < beamCount; ++b) {
+                x1 = (x - m_rules[b].x) * cosA[b] - y * sinA[b];
+                if (x1 < 0.0) break;
+            }
+            if (b == 0 || b == beamCount) continue;
+
+            const double y1 = y * cosA[b] + (x - m_rules[b].x) * sinA[b];
+            const double y0 = y * cosA[b - 1] + (x - m_rules[b - 1].x) * sinA[b - 1];
+            const int n0 = int(y0 + 1.0);
+            const int n1 = int(y1 + 1.0);
+            if (n0 < 0 || n1 < 0 || n0 >= WaveSampleCount || n1 >= WaveSampleCount)
+                continue;
+
+            const double x0 = (x - m_rules[b - 1].x) * cosA[b - 1] - y * sinA[b - 1];
+            const double d = x0 - x1;
+            m_mapBeam0[outIndex] = quint8(b - 1);
+            m_mapBeam1[outIndex] = quint8(b);
+            m_mapSample0[outIndex] = quint16(n0);
+            m_mapSample1[outIndex] = quint16(n1);
+            m_mapBlend[outIndex] = x0 < 0.25 * d ? 0 : (x0 < 0.75 * d ? 1 : 2);
+        }
+    }
 }
 
 void BScanWidget::setRulePositions(const QVector<double> &positions)
@@ -86,11 +136,18 @@ void BScanWidget::softwareImaging(
     const std::vector<std::array<uint8_t, WaveSampleCount>> &waveforms,
     int beamCount, uint8_t *img)
 {
+    std::fill_n(img, SImageSize, uint8_t(0xFF));
     const int count = qBound(0, beamCount, MaxBeams);
-    const uint8_t *waveP[MaxBeams] = {};
-    for (int b = 0; b < count; ++b)
-        waveP[b] = waveforms[b].data();
-    ::softwareImaging(waveP, m_rules, count, img);
+    for (int i = 0; i < SImageSize; ++i) {
+        const int b0 = m_mapBeam0[i];
+        if (b0 == 0xFF || b0 >= count) continue;
+        const int b1 = m_mapBeam1[i];
+        if (b1 >= count) continue;
+        const int v0 = waveforms[b0][m_mapSample0[i]];
+        const int v1 = waveforms[b1][m_mapSample1[i]];
+        const int value = m_mapBlend[i] == 0 ? v0 : (m_mapBlend[i] == 1 ? (v0 + v1) / 2 : v1);
+        img[i] = uint8_t(qMin(value, 250));
+    }
 }
 
 QImage BScanWidget::buildDisplayImage() const
@@ -132,7 +189,8 @@ void BScanWidget::setMultiBeamData(const QVector<QVector<double>> &waves, bool i
     if (!m_rulePositions.isEmpty())
         effectiveBeamCount = qMin(effectiveBeamCount, m_rulePositions.size());
 
-    computeScanRules(effectiveBeamCount);
+    if (effectiveBeamCount != m_ruleBeamCount)
+        computeScanRules(effectiveBeamCount);
 
     std::vector<std::array<uint8_t, WaveSampleCount>> rawWaves(effectiveBeamCount);
     for (int b = 0; b < effectiveBeamCount; ++b) {
@@ -214,7 +272,14 @@ void BScanWidget::paintEvent(QPaintEvent *)
 
     if (!m_displayImage.isNull()) {
         p.setRenderHint(QPainter::SmoothPixmapTransform, false);
-        p.drawImage(plot, m_displayImage);
+        // 保持 512:400 原始宽高比，居中绘制，避免拉伸变形
+        const QSize fitted = QSize(CScanWidth, WaveSampleCount)
+            .scaled(plot.size(), Qt::KeepAspectRatio);
+        const QRect target(
+            plot.left() + (plot.width()  - fitted.width())  / 2,
+            plot.top()  + (plot.height() - fitted.height()) / 2,
+            fitted.width(), fitted.height());
+        p.drawImage(target, m_displayImage);
     }
 
     QFont axisFont(ThemeFont::Ui, 8);

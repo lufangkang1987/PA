@@ -133,11 +133,12 @@ void ParameterDispatcher::applyLaw(const PAParams &params)
     m_driver->setHighVoltage(params.tx.highVoltage);
     m_driver->setPulseWidth(params.tx.pulseWidth);
     m_driver->setPRF(params.tx.prf);
+    // range_ratio 依赖 ADataLen，必须先设置采样长度再设置检测范围。
+    m_driver->setADataLen(params.tx.aDataLen);
     m_driver->setRange(params.tx.range);
     m_driver->setCurrentBeam(params.rx.curBeam);
     m_driver->setRectify(params.rx.rectify);
     m_driver->setFilter(params.rx.filter);
-    m_driver->setADataLen(params.tx.aDataLen);
 
     if (params.rx.video < 5) {
         m_driver->setASmooth(false);

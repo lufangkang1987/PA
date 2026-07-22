@@ -70,7 +70,8 @@ void ParamPage::getGateParams(int gate, bool &enabled, float &start, float &widt
                               float &threshold) const
 {
     if (gate < 0 || gate > 2) return;
-    enabled   = m_params.gate.gateAlarm[gate] != 0;
+    // gateAlarm 只控制报警逻辑，不是闸门显示开关；A/B/C 闸门始终按参数绘制。
+    enabled   = true;
     start     = m_params.gate.gateStart[gate];
     width     = m_params.gate.gateWidth[gate];
     threshold = m_params.gate.gateThreshold[gate];

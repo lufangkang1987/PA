@@ -443,6 +443,7 @@ void ParamPage::syncUiFromParams()
 
     // 通知闸门同步
     emit gateParamsChanged();
+    emit beamInfoChanged(p.rx.curBeam, p.rx.aGain);
 }
 
 // ── 文件目录辅助 ──
@@ -451,23 +452,25 @@ static QString dataDir()    { QString d = QCoreApplication::applicationDirPath()
 
 bool ParamPage::initializeParams()
 {
-    const QString path = paramsDir() + "/default.json";
-    QFile file(path);
+    const QString sessionPath = paramsDir() + "/last_session.json";
+    const QString defaultPath = paramsDir() + "/default.json";
 
-    if (file.exists()) {
-        if (!file.open(QIODevice::ReadOnly))
-            return false;
+    // 正常启动优先恢复上次关闭时的参数；默认文件只作为首次启动/恢复失败的模板。
+    for (const QString &path : {sessionPath, defaultPath}) {
+        QFile file(path);
+        if (!file.exists() || !file.open(QIODevice::ReadOnly))
+            continue;
 
         QJsonParseError error;
         const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
-        if (error.error != QJsonParseError::NoError || !document.isObject())
-            return false;
-
-        deserializeParams(document.object());
-        syncUiFromParams();
-        return true;
+        if (error.error == QJsonParseError::NoError && document.isObject()) {
+            deserializeParams(document.object());
+            syncUiFromParams();
+            return true;
+        }
     }
 
+    QFile file(defaultPath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return false;
 

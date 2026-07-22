@@ -39,6 +39,7 @@ private:
     void wireCalibration();
     void applyGlobalStyleSheet();
     void wireDriverSignals();
+    void syncGateDisplay();
     bool loadParamsFile(const QString &path);
     bool enterMode(AppMode mode);
     void leaveMode(AppMode mode);

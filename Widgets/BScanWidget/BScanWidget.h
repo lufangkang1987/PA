@@ -52,6 +52,7 @@ private:
 
     void buildColorLUT();
     void computeScanRules(int beamCount);
+    void rebuildImagingMap(int beamCount);
     void softwareImaging(const std::vector<std::array<uint8_t, WaveSampleCount>> &waveforms,
                          int beamCount, uint8_t *img);
     QImage buildDisplayImage() const;
@@ -60,6 +61,12 @@ private:
     std::vector<uint8_t> m_sImage;
     QImage m_displayImage;
     ScanRule m_rules[MaxBeams];
+    QVector<quint8> m_mapBeam0;
+    QVector<quint8> m_mapBeam1;
+    QVector<quint16> m_mapSample0;
+    QVector<quint16> m_mapSample1;
+    QVector<quint8> m_mapBlend;
+    int m_ruleBeamCount = 0;
     float m_imgSpanStart = 0.0f;
     float m_imgSpanEnd = 0.0f;
     QVector<double> m_rulePositions;

@@ -12,6 +12,8 @@ struct GateReadings {
     double aSoundPathMm      = 0.0;
     double bAmplitude        = 0.0;
     double bSoundPathMm      = 0.0;
+    double cAmplitude        = 0.0;
+    double cSoundPathMm      = 0.0;
     bool   alarmTriggered    = false;
 };
 
@@ -42,17 +44,19 @@ inline GateReadings calculateReadings(const PAParams &params, const DataPacket &
     }
 
     // ── 声程转换 ──
-    auto soundPathMm = [&params](quint16 path) -> double {
-        return params.gate.gateTrace[2]
-            ? path * params.tx.range / WaveSampleCount
-            : path * S22_SP * params.wp.lVelocity / 2000000.0;
+    auto normalSoundPathMm = [&params](quint16 path) -> double {
+        return path * S22_SP * params.wp.lVelocity / 2000000.0;
     };
 
     // ── 闸门读数 ──
     r.aAmplitude   = qMin(100.0, wave.amp0 / 2.5);
-    r.aSoundPathMm = soundPathMm(wave.path0);
+    r.aSoundPathMm = params.gate.gateTrace[2]
+        ? wave.path0 * params.tx.range / WaveSampleCount
+        : normalSoundPathMm(wave.path0);
     r.bAmplitude   = qMin(100.0, wave.amp1 / 2.5);
-    r.bSoundPathMm = soundPathMm(wave.path1);
+    r.bSoundPathMm = normalSoundPathMm(wave.path1);
+    r.cAmplitude   = qMin(100.0, wave.amp2 / 2.5);
+    r.cSoundPathMm = normalSoundPathMm(wave.path2);
 
     // ── 报警判定 ──
     if (params.gate.alarmSound != 0) {

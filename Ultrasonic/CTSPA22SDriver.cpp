@@ -832,18 +832,41 @@ QJsonObject CTSPA22SDriver::buildScanTypeCommand(int type)
 
 QJsonObject CTSPA22SDriver::buildGainCommand(float analogGain)
 {
-    // 根据 CTSPA22S 增益表将 dB 值拆分为 vga1/vga2 两级
-    float vga1, vga2;
-    if (analogGain <= 20.0f) {
-        vga1 = analogGain;
-        vga2 = 0.0f;
-    } else if (analogGain <= 40.0f) {
-        vga1 = 20.0f;
-        vga2 = analogGain - 20.0f;
-    } else {
-        vga1 = qMin(analogGain * 0.5f, 30.0f);
-        vga2 = analogGain - vga1;
-    }
+    // CTSPA22S 的 vga1/vga2 是硬件寄存器码，不是 dB 值。
+    // 查表和相邻整数 dB 之间的线性插值与原 MFC 程序保持一致。
+    static constexpr int dBLv1[81] = {
+        0x000, 0x020, 0x050, 0x050, 0x050, 0x068, 0x080, 0x090,
+        0x0a0, 0x0b0, 0x0be, 0x0d0, 0x0e0, 0x0f0, 0x100, 0x110,
+        0x120, 0x132, 0x145, 0x145, 0x145, 0x145, 0x145, 0x145,
+        0x145, 0x145, 0x145, 0x145, 0x145, 0x145, 0x145, 0x155,
+        0x163, 0x171, 0x181, 0x192, 0x1a3, 0x1a3, 0x1a3, 0x1a3,
+        0x1a3, 0x1a3, 0x1a3, 0x1b2, 0x1c0, 0x1ce, 0x1df, 0x1f3,
+        0x205, 0x205, 0x205, 0x205, 0x205, 0x205, 0x205, 0x214,
+        0x222, 0x231, 0x244, 0x257, 0x269, 0x269, 0x269, 0x269,
+        0x269, 0x269, 0x269, 0x279, 0x289, 0x2a2, 0x2a2, 0x2a2,
+        0x2a2, 0x2a2, 0x2a2, 0x2b8, 0x2cc, 0x2ec, 0x2ec, 0x2ec,
+        0x2ec
+    };
+    static constexpr int dBLv2[81] = {
+        0x000, 0x000, 0x000, 0x030, 0x050, 0x050, 0x050, 0x050,
+        0x050, 0x050, 0x050, 0x050, 0x050, 0x050, 0x050, 0x050,
+        0x050, 0x050, 0x050, 0x06a, 0x07f, 0x090, 0x09e, 0x0ab,
+        0x0b8, 0x0c8, 0x0db, 0x0ed, 0x0fc, 0x10a, 0x119, 0x119,
+        0x119, 0x119, 0x119, 0x119, 0x119, 0x12a, 0x13c, 0x14d,
+        0x15c, 0x16c, 0x17d, 0x17d, 0x17d, 0x17d, 0x17d, 0x17d,
+        0x17d, 0x190, 0x1a2, 0x1b1, 0x1bf, 0x1cd, 0x1df, 0x1df,
+        0x1df, 0x1df, 0x1df, 0x1df, 0x1df, 0x1f3, 0x204, 0x213,
+        0x223, 0x232, 0x245, 0x245, 0x245, 0x245, 0x257, 0x267,
+        0x277, 0x289, 0x2a2, 0x2a2, 0x2a2, 0x2a2, 0x2b8, 0x2cd,
+        0x2ec
+    };
+
+    const float gainDb = qBound(0.0f, analogGain, 80.0f);
+    const int lower = qFloor(gainDb);
+    const int upper = qMin(lower + 1, 80); // 避免 80 dB 时访问表外元素
+    const float fraction = gainDb - static_cast<float>(lower);
+    const int vga1 = qRound(dBLv1[lower] + (dBLv1[upper] - dBLv1[lower]) * fraction);
+    const int vga2 = qRound(dBLv2[lower] + (dBLv2[upper] - dBLv2[lower]) * fraction);
 
     QJsonObject gainObj;
     gainObj["vga1"] = vga1;
@@ -883,19 +906,33 @@ QJsonObject CTSPA22SDriver::buildGateCommand(char gate, float start,
                                               float width, float threshold,
                                               const QString &measureType)
 {
+    // 仪器闸门参数使用采样时钟计数和 0..250 幅值，不直接接收 mm/%。
+    // 命令结构及换算与 MFC set gate_a/b/c 保持一致。
+    const int startTicks = static_cast<int>(start * 2.0 / m_velocity
+                                             * 1000000.0 / S22_SP);
+    int widthTicks = static_cast<int>(width * 2.0 / m_velocity
+                                      * 1000000.0 / S22_SP);
+    if (m_aDataLen == 2 && m_range < 10.0f)
+        widthTicks *= 2;
+    const int height = static_cast<int>(threshold * 2.5f);
+
     QJsonObject gateObj;
     gateObj["name"] = QString(gate);
 
     QJsonObject ctrl;
     ctrl["mode"] = measureType;
+    ctrl["tracing"] = QString();
+    gateObj["ctrl"] = ctrl;
 
     QJsonArray params;
-    params.append(start);
-    params.append(width);
-    params.append(threshold);
-    ctrl["param"] = params;
-
-    gateObj["ctrl"] = ctrl;
+    for (int beam = 0; beam < MaxBeams; ++beam) {
+        QJsonObject beamGate;
+        beamGate["start"] = startTicks;
+        beamGate["width"] = widthTicks;
+        beamGate["height"] = height;
+        params.append(beamGate);
+    }
+    gateObj["param"] = params;
 
     QJsonObject obj;
     obj["gate"] = gateObj;
@@ -904,8 +941,17 @@ QJsonObject CTSPA22SDriver::buildGateCommand(char gate, float start,
 
 QJsonObject CTSPA22SDriver::buildRangeCommand(float range)
 {
-    // range_ratio = Range * S22_SP(=10) / 声速 * 1000000 / 2
-    float ratio = range * 10.0f / m_velocity * 1000000.0f / 2.0f;
+    // 与 MFC set range 完全一致：400 个显示点对应声波往返时间内的采样点。
+    // ADataLen=0/1 时设备分别只返回 100/200 个原始波形点，因此需要缩放。
+    double ratio = 400.0 / (static_cast<double>(range) * 2.0 / m_velocity
+                            * 1000000.0 / S22_SP);
+    if (m_aDataLen == 0)
+        ratio /= 4.0;
+    else if (m_aDataLen == 1)
+        ratio /= 2.0;
+    else if (range < 10.0f)
+        ratio /= 2.0;
+
     QJsonObject obj;
     obj["range_ratio"] = ratio;
     return obj;
@@ -1004,11 +1050,14 @@ void CTSPA22SDriver::setFilter(int filter)
 
 void CTSPA22SDriver::setADataLen(int len)
 {
-    m_aDataLen = len;
+    m_aDataLen = qBound(0, len, 2);
     QJsonObject obj;
-    int sampleCount = (len == 0 ? 128 : (len == 1 ? 256 : 512));
+    int sampleCount = (m_aDataLen == 0 ? 128 : (m_aDataLen == 1 ? 256 : 512));
     obj["a_data_len"] = sampleCount;
     sendJsonCommand(obj);
+
+    // range_ratio 与 ADataLen 相关，采样长度改变后必须同步更新采样时间窗。
+    sendJsonCommand(buildRangeCommand(m_range));
 }
 
 void CTSPA22SDriver::setASmooth(bool enable)

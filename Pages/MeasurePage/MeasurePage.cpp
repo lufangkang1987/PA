@@ -167,8 +167,10 @@ void MeasurePage::updateGateReadings(char gate, double amplitudePercent, double 
         m_gateBPathReading->setValue(soundPathMm, 1);
         //m_bHorizontalReading->setValue(horizontal, 1);
         //m_bVerticalReading->setValue(vertical, 1);
+    } else if (gate == 'C') {
+        m_gateCAmpReading->setValue(amplitudePercent, 1);
+        m_gateCPathReading->setValue(soundPathMm, 1);
     }
-    // Gate C: 耦合监视闸门，右侧面板不显示读数
 }
 
 void MeasurePage::updateBeamInfo(int beamNo, double gain)

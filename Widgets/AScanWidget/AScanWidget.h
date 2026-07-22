@@ -55,7 +55,7 @@ public slots:
     int  activeGate() const       { return m_activeGate; }
 
     /// 报警状态
-    void setAlarm(bool on) { m_alarm = on; update(); }
+    void setAlarm(bool on) { if (m_alarm != on) { m_alarm = on; update(); } }
 
 signals:
     /// 闸门拖拽完成 (gate, start_mm, threshold_pct)

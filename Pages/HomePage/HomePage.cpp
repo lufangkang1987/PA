@@ -122,7 +122,8 @@ void ReadingItem::setValue(double val, int decimals)
 }
 
 // ─── makeCard ───
-static QFrame* makeCard(const QString& title, QWidget* content, const QString& meta = QString())
+static QFrame* makeCard(const QString& title, QWidget* content, const QString& meta = QString(),
+                        ElidedLabel **metaOutput = nullptr)
 {
 	auto* card = new QFrame;
 	card->setObjectName("DataCard");
@@ -139,6 +140,7 @@ static QFrame* makeCard(const QString& title, QWidget* content, const QString& m
 		header->addWidget(titleLabel, 1);
 		if (!meta.isEmpty()) {
 			auto* metaLabel = new ElidedLabel(meta);
+			if (metaOutput) *metaOutput = metaLabel;
 			metaLabel->setObjectName("CardMeta");
 			metaLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 			header->addWidget(metaLabel, 2);
@@ -194,8 +196,9 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 	setGateParams(1, true,  6.2f, 3.0f, 30.0f, QColor(255, 200, 0));
 	setGateParams(2, true,  0.5f, 3.0f, 30.0f, QColor(200, 50, 255));
 
-	grid->addWidget(makeCard(QString::fromUtf8("A扫波形"), m_aScan, QString::fromUtf8("通道：1 | 增益：18.0 dB")), 0, 0);
-	grid->addWidget(makeCard(QString::fromUtf8("B扫图像"), m_bScan, QString::fromUtf8("扫描范围：200.0 mm")), 0, 1);
+	grid->addWidget(makeCard(QString::fromUtf8("A扫波形"), m_aScan,
+	                         QString::fromUtf8("通道：1 | 增益：18.0 dB"), &m_aScanMeta), 0, 0);
+	grid->addWidget(makeCard(QString::fromUtf8("B扫图像"), m_bScan, QString(), &m_bScanMeta), 0, 1);
 	grid->addWidget(makeCard(QString::fromUtf8("C扫图像"), m_cScan), 1, 0, 1, 2);
 
 	grid->setColumnStretch(0, 5);
@@ -268,18 +271,30 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 void HomePage::setAScanWaveform(const QVector<double> &data, int beamIndex,
                                  int frameIndex, int rectifyMode)
 {
-    if (m_aScan) {
-        if (m_paramsSource)
-            m_aScan->setAcousticParams(float(m_paramsSource->wp.lVelocity),
-                                       100, m_paramsSource->tx.range);
+    if (m_aScan)
         m_aScan->setWaveform(data, beamIndex, frameIndex, rectifyMode);
-    }
+}
+
+void HomePage::updateBeamInfo(int beamIndex, double gainDb)
+{
+    if (m_aScanMeta)
+        m_aScanMeta->setFullText(QString::fromUtf8("通道：%1 | 增益：%2 dB")
+                                 .arg(beamIndex + 1).arg(gainDb, 0, 'f', 1));
 }
 
 void HomePage::setBScanWaveforms(const QVector<QVector<double>> &waves)
 {
     if (m_bScan)
         m_bScan->setMultiBeamData(waves, false);
+    // 动态更新 B 扫范围标签（仅在范围实际变化时）
+    if (m_bScanMeta && m_paramsSource) {
+        const float r = m_paramsSource->tx.range;
+        if (!qFuzzyCompare(r, m_lastBScanRange)) {
+            m_lastBScanRange = r;
+            m_bScanMeta->setFullText(QString::fromUtf8("扫描范围：%1 mm")
+                                     .arg(double(r), 0, 'f', 1));
+        }
+    }
     bool alarm = false;
     for (const auto &w : waves)
         for (const auto &v : w) { if (v > 0.8) { alarm = true; break; } }
@@ -300,6 +315,9 @@ void HomePage::bindParams(const PAParams *params)
 		m_aScan->setAcousticParams(float(params->wp.lVelocity), 100, params->tx.range);
 	if (m_bScan)
 		m_bScan->setParamsSource(params);
+	if (m_bScanMeta && params)
+		m_bScanMeta->setFullText(QString::fromUtf8("扫描范围：%1 mm")
+		                         .arg(params->tx.range, 0, 'f', 1));
 }
 
 void HomePage::setGateParams(int gate, bool enabled, float start, float width,

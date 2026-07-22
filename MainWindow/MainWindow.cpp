@@ -13,6 +13,7 @@
 #include "CScanIOManager.h"
 #include "CScanEngine.h"
 #include "CScanDataCodec.h"
+#include "Logging/Logger.h"
 #include <QWidget>
 #include <QStatusBar>
 #include <QVBoxLayout>
@@ -23,6 +24,7 @@
 #include <QCloseEvent>
 #include <QFileDialog>
 #include <QFile>
+#include <QSaveFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QCoreApplication>
@@ -31,6 +33,7 @@
 #include <QDateTime>
 #include <QMessageBox>
 #include <QThread>
+#include <QTimer>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
@@ -65,6 +68,16 @@ void MainWindow::setupUi()
 
     statusBar()->showMessage(QString::fromUtf8("系统就绪"));
     setUpdatesEnabled(true);
+
+    // 批量构建期间关闭过更新；事件循环启动后显式安排首帧，避免首次进入界面为空白，
+    // 直到调整窗口或修改参数才触发重绘。
+    QTimer::singleShot(0, this, [this] {
+        syncGateDisplay();
+        update();
+        if (m_homePage) m_homePage->update();
+        if (m_paramPage) m_paramPage->update();
+        if (m_measurePage) m_measurePage->update();
+    });
 }
 
 void MainWindow::buildHeader(QVBoxLayout *root)
@@ -215,17 +228,10 @@ void MainWindow::wirePageSignals()
 
     // 参数页闸门变化 → 主页A扫闸门显示
     connect(m_paramPage, &ParamPage::gateParamsChanged, this, [this] {
-        static const QColor gateColors[3] = {
-            ThemeColor::GateA, ThemeColor::GateB, ThemeColor::GateC
-        };
-        for (int g = 0; g < 3; ++g) {
-            bool enabled; float start, width, threshold;
-            m_paramPage->getGateParams(g, enabled, start, width, threshold);
-            m_homePage->setGateParams(g, enabled, start, width, threshold, gateColors[g]);
-        }
-        // 同步当前选中闸门（拖拽时用）
-        m_homePage->setActiveGate(m_paramPage->activeGate());
+        syncGateDisplay();
     });
+    // 参数在页面信号连接前已经加载，启动时必须主动同步一次，不能保留A扫构造默认值。
+    syncGateDisplay();
 
     // C扫扫描按钮信号（来自 ParamPage 成像子页）
     connect(m_paramPage, &ParamPage::scanStarted, this, [this] {
@@ -251,6 +257,27 @@ void MainWindow::wirePageSignals()
     // 声束号 / 增益变化 → 右侧测量面板读数
     connect(m_paramPage, &ParamPage::beamInfoChanged,
             m_measurePage, &MeasurePage::updateBeamInfo);
+    connect(m_paramPage, &ParamPage::beamInfoChanged,
+            m_homePage, &HomePage::updateBeamInfo);
+
+    // initializeParams() 发生在信号连接之前，启动后主动同步一次当前值。
+    const auto &startupParams = m_paramPage->params();
+    m_measurePage->updateBeamInfo(startupParams.rx.curBeam, startupParams.rx.aGain);
+    m_homePage->updateBeamInfo(startupParams.rx.curBeam, startupParams.rx.aGain);
+}
+
+void MainWindow::syncGateDisplay()
+{
+    static const QColor gateColors[3] = {
+        ThemeColor::GateA, ThemeColor::GateB, ThemeColor::GateC
+    };
+    for (int g = 0; g < 3; ++g) {
+        bool enabled = true;
+        float start = 0.0f, width = 0.0f, threshold = 0.0f;
+        m_paramPage->getGateParams(g, enabled, start, width, threshold);
+        m_homePage->setGateParams(g, enabled, start, width, threshold, gateColors[g]);
+    }
+    m_homePage->setActiveGate(m_paramPage->activeGate());
 }
 
 void MainWindow::wireCScanIO()
@@ -455,6 +482,7 @@ void MainWindow::wireDriverSignals()
         if (!m_measurePage) return;
         m_measurePage->updateGateReadings('A', r.aAmplitude, r.aSoundPathMm, r.angleDegrees, r.horizontalOffsetMm);
         m_measurePage->updateGateReadings('B', r.bAmplitude, r.bSoundPathMm, r.angleDegrees, r.horizontalOffsetMm);
+        m_measurePage->updateGateReadings('C', r.cAmplitude, r.cSoundPathMm, r.angleDegrees, r.horizontalOffsetMm);
     });
 
     // ── 报警 ──
@@ -538,6 +566,19 @@ void MainWindow::leaveMode(AppMode mode)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    // 使用原子写入保存本次会话参数，防止异常中断留下半个 JSON 文件。
+    const QString paramsDir = QCoreApplication::applicationDirPath() + "/params";
+    QDir().mkpath(paramsDir);
+    QSaveFile sessionFile(paramsDir + "/last_session.json");
+    if (sessionFile.open(QIODevice::WriteOnly)) {
+        sessionFile.write(QJsonDocument(m_paramPage->serializeParams())
+                              .toJson(QJsonDocument::Indented));
+        if (!sessionFile.commit())
+            PA_LOG_WARNING("PARAM", QStringLiteral("Failed to save last session parameters"));
+    } else {
+        PA_LOG_WARNING("PARAM", QStringLiteral("Cannot open last_session.json for writing"));
+    }
+
     // 正常关闭路径: 先断仪器，再走默认关闭流程
     if (m_driver && m_driver->isConnected()) {
         m_driver->stopAcquisition();

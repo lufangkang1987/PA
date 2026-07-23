@@ -175,6 +175,28 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 
 	m_aScan = new AScanWidget;
 	m_bScan = new BScanWidget;
+	m_bScanRenderTimer = new QTimer(this);
+	m_bScanRenderTimer->setTimerType(Qt::PreciseTimer);
+	m_bScanRenderTimer->setInterval(30);
+	connect(m_bScanRenderTimer, &QTimer::timeout, this, [this] {
+		const auto packet = m_latestBScanPacket;
+		if (!packet) {
+			m_bScanRenderTimer->stop();
+			return;
+		}
+		if (!m_bScan ||
+		    (m_hasRenderedBScanFrame && packet->frameIndex == m_lastRenderedBScanFrame))
+			return;
+		m_lastRenderedBScanFrame = packet->frameIndex;
+		m_hasRenderedBScanFrame = true;
+		m_bScan->renderFromPacket(packet);
+
+		bool alarm = false;
+		for (int b = 0; b < packet->beamCount && !alarm; ++b)
+			for (int i = 0; i < WaveSampleCount; ++i)
+				if (packet->beams[b].waveP[i] > 204) { alarm = true; break; }
+		if (m_aScan) m_aScan->setAlarm(alarm);
+	});
 	m_cScan = new CScanWidget;
 	connect(m_cScan, &CScanWidget::positionSelected,
 	        this, &HomePage::cScanPositionSelected);
@@ -191,6 +213,7 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent)
 
 		connect(m_aScan, &AScanWidget::gateDragged, this, &HomePage::gateDragged);
 		connect(m_aScan, &AScanWidget::beamChangeRequested, this, &HomePage::beamChangeRequested);
+	connect(m_bScan, &BScanWidget::beamSelected, this, &HomePage::beamChangeRequested);
 	// ── 默认闸门参数 ──
 	setGateParams(0, true,  2.5f, 4.0f, 40.0f, QColor(255, 30, 30));
 	setGateParams(1, true,  6.2f, 3.0f, 30.0f, QColor(255, 200, 0));
@@ -302,6 +325,13 @@ void HomePage::setBScanWaveforms(const QVector<QVector<double>> &waves)
         m_aScan->setAlarm(alarm);
 }
 
+void HomePage::setLatestDataPacket(std::shared_ptr<DataPacket> packet)
+{
+    m_latestBScanPacket = std::move(packet);
+    if (m_latestBScanPacket && !m_bScanRenderTimer->isActive())
+        m_bScanRenderTimer->start();
+}
+
 void HomePage::setBScanRulePositions(const QVector<double> &positions)
 {
     if (m_bScan)
@@ -318,6 +348,12 @@ void HomePage::bindParams(const PAParams *params)
 	if (m_bScanMeta && params)
 		m_bScanMeta->setFullText(QString::fromUtf8("扫描范围：%1 mm")
 		                         .arg(params->tx.range, 0, 'f', 1));
+}
+
+void HomePage::refreshBScanFromParams()
+{
+    if (m_bScan && m_paramsSource)
+        m_bScan->setParamsSource(m_paramsSource);
 }
 
 void HomePage::setGateParams(int gate, bool enabled, float start, float width,

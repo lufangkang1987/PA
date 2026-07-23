@@ -1,6 +1,7 @@
 ﻿#include "ParamPage.h"
 #include "ParamPageUiHelpers.h"
 #include "ParameterDispatcher.h"
+#include "ReceiveParamPage.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -514,4 +515,6 @@ ParamPage::ParamPage(QWidget *parent) : QFrame(parent)
 void ParamPage::setDispatcher(ParameterDispatcher *dispatcher)
 {
     m_dispatcher = dispatcher;
+    if (m_receivePage)
+        m_receivePage->setDispatcher(dispatcher);
 }

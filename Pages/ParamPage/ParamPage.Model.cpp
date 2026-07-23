@@ -2,6 +2,7 @@
 #include "ParamPageUiHelpers.h"
 #include "ParameterDispatcher.h"
 #include "TcgParamPage.h"
+#include "ReceiveParamPage.h"
 
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -443,6 +444,8 @@ void ParamPage::syncUiFromParams()
 
     // 通知闸门同步
     emit gateParamsChanged();
+    if (m_receivePage)
+        m_receivePage->updateBeamNoRange();
     emit beamInfoChanged(p.rx.curBeam, p.rx.aGain);
 }
 

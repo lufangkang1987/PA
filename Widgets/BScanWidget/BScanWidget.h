@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include <memory>
 
 struct PAParams;
 
@@ -19,6 +20,7 @@ public:
 
     void setParamsSource(const PAParams *params);
     void setMultiBeamData(const QVector<QVector<double>> &waves, bool isRF = false);
+    void renderFromPacket(const std::shared_ptr<DataPacket> &packet);
 
     void setScanParams(int scanType, float angleFrom, float angleTo,
                        int beamCount, float range,
@@ -33,8 +35,13 @@ public:
     void setFrozen(bool frozen);
     bool isFrozen() const { return m_frozen; }
 
+signals:
+    /// 用户点击 B 扫图像选择了某条声束
+    void beamSelected(int beamIndex);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     struct ScanConfig
@@ -55,6 +62,7 @@ private:
     void rebuildImagingMap(int beamCount);
     void softwareImaging(const std::vector<std::array<uint8_t, WaveSampleCount>> &waveforms,
                          int beamCount, uint8_t *img);
+    void softwareImaging(const DataPacket &packet, int beamCount, uint8_t *img);
     QImage buildDisplayImage() const;
 
     QVector<QRgb> m_colorLUT;
@@ -73,6 +81,9 @@ private:
     ScanConfig m_scan;
     const PAParams *m_params = nullptr;
 
+    QRect imageRect() const;
+
     bool m_frozen = false;
     bool m_hasData = false;
+    int  m_selectedBeam = -1;  // -1 = 未选中，不画指示线
 };

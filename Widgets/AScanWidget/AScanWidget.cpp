@@ -245,8 +245,9 @@ void AScanWidget::paintEvent(QPaintEvent *)
         const QFontMetrics hm(hud);
         static const char *modes[] = {"QW", "ZW", "FW", "RF"};
         const char *mn = (m_rectifyMode >= 0 && m_rectifyMode <= 3) ? modes[m_rectifyMode] : "??";
-        QString txt = QString("Beam %1  Frame %2  %3  %.1fmm  %4 FPS")
-            .arg(m_beamIndex + 1).arg(m_frameIndex).arg(mn).arg(totalMm, 0, 'f', 1).arg(m_currentFps, 0, 'f', 1);
+        QString txt = QString("Beam %1  Frame %2  %3  %4mm  %5 FPS")
+            .arg(m_beamIndex + 1).arg(m_frameIndex).arg(mn)
+            .arg(totalMm, 0, 'f', 1).arg(m_currentFps, 0, 'f', 1);
         p.setPen(m_isLive ? QColor(0, 220, 50, 200) : QColor(80, 100, 80, 150));
         p.drawText(plot.right() - hm.horizontalAdvance(txt) - 4,
                    plot.top() + 12, txt);

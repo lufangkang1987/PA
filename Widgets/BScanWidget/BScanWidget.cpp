@@ -5,6 +5,7 @@
 #include "Theme.h"
 
 #include <QPainter>
+#include <QMouseEvent>
 #include <QtMath>
 #include <algorithm>
 
@@ -27,7 +28,17 @@ BScanWidget::BScanWidget(QWidget *parent) : QWidget(parent)
 void BScanWidget::setParamsSource(const PAParams *params)
 {
     m_params = params;
-    computeScanRules(m_params ? m_params->global.beamCount : m_scan.beamCount);
+    m_selectedBeam = -1;  // 扫查参数变化后清除旧的声束选择
+    int beamCount = m_scan.beamCount;
+    if (m_params) {
+        // MFC OnRuleReset: L-scan rule count is determined by the active
+        // element interval and aperture, not by the global 128-beam slot.
+        beamCount = m_params->scan.scanType == 1
+            ? m_params->scan.eleEnd - m_params->scan.eleStart + 2
+                - m_params->scan.eleAperture
+            : m_params->global.beamCount;
+    }
+    computeScanRules(qBound(1, beamCount, MaxBeams));
     m_displayImage = buildDisplayImage();
     update();
 }
@@ -150,6 +161,23 @@ void BScanWidget::softwareImaging(
     }
 }
 
+void BScanWidget::softwareImaging(const DataPacket &packet, int beamCount, uint8_t *img)
+{
+    std::fill_n(img, SImageSize, uint8_t(0xFF));
+    const int count = qBound(0, qMin(beamCount, packet.beamCount), MaxBeams);
+    for (int i = 0; i < SImageSize; ++i) {
+        const int b0 = m_mapBeam0[i];
+        if (b0 == 0xFF || b0 >= count) continue;
+        const int b1 = m_mapBeam1[i];
+        if (b1 >= count) continue;
+        const int v0 = packet.beams[b0].waveP[m_mapSample0[i]];
+        const int v1 = packet.beams[b1].waveP[m_mapSample1[i]];
+        const int value = m_mapBlend[i] == 0 ? v0
+            : (m_mapBlend[i] == 1 ? (v0 + v1) / 2 : v1);
+        img[i] = uint8_t(qMin(value, 250));
+    }
+}
+
 QImage BScanWidget::buildDisplayImage() const
 {
     QImage img(CScanWidth, WaveSampleCount, QImage::Format_RGB32);
@@ -203,6 +231,22 @@ void BScanWidget::setMultiBeamData(const QVector<QVector<double>> &waves, bool i
 
     softwareImaging(rawWaves, effectiveBeamCount, m_sImage.data());
 
+    m_hasData = true;
+    m_displayImage = buildDisplayImage();
+    update();
+}
+
+void BScanWidget::renderFromPacket(const std::shared_ptr<DataPacket> &packet)
+{
+    if (m_frozen || !packet || packet->beamCount < 1) return;
+
+    int effectiveBeamCount = qMin(packet->beamCount, MaxBeams);
+    if (!m_rulePositions.isEmpty())
+        effectiveBeamCount = qMin(effectiveBeamCount, m_rulePositions.size());
+    if (effectiveBeamCount != m_ruleBeamCount)
+        computeScanRules(effectiveBeamCount);
+
+    softwareImaging(*packet, effectiveBeamCount, m_sImage.data());
     m_hasData = true;
     m_displayImage = buildDisplayImage();
     update();
@@ -272,14 +316,48 @@ void BScanWidget::paintEvent(QPaintEvent *)
 
     if (!m_displayImage.isNull()) {
         p.setRenderHint(QPainter::SmoothPixmapTransform, false);
-        // 保持 512:400 原始宽高比，居中绘制，避免拉伸变形
-        const QSize fitted = QSize(CScanWidth, WaveSampleCount)
-            .scaled(plot.size(), Qt::KeepAspectRatio);
-        const QRect target(
-            plot.left() + (plot.width()  - fitted.width())  / 2,
-            plot.top()  + (plot.height() - fitted.height()) / 2,
-            fitted.width(), fitted.height());
-        p.drawImage(target, m_displayImage);
+        const QRect target = imageRect();
+        if (target.isValid()) {
+            p.drawImage(target, m_displayImage);
+
+            // 用户点击选择的声束指示虚线
+            if (m_selectedBeam >= 0 && m_selectedBeam < m_ruleBeamCount) {
+            const ScanRule &rule = m_rules[m_selectedBeam];
+            const double rad = qDegreesToRadians(double(rule.ang));
+            const double x0 = rule.x;
+            const double y0 = 0.0;
+            const double x1 = x0 + 400.0 * std::sin(rad);
+            const double y1 = y0 + 400.0 * std::cos(rad);
+
+            auto mapX = [&target](double ix) { return target.left() + ix * target.width() / double(CScanWidth); };
+            auto mapY = [&target](double iy) { return target.top()  + iy * target.height() / double(WaveSampleCount); };
+
+            QPen beamPen(QColor(255, 220, 60), 1.0, Qt::DashLine);  // 亮黄色虚线
+            p.setPen(beamPen);
+            p.drawLine(QPointF(mapX(x0), mapY(y0)), QPointF(mapX(x1), mapY(y1)));
+            }
+
+            // MFC DrawBView：C扫取点区域线，有参数时始终显示
+            if (m_params) {
+                const int x1 = m_params->img.imgLineX1;
+                const int x2 = m_params->img.imgLineX2;
+                const int y1 = m_params->img.imgLineY1;
+                const int y2 = m_params->img.imgLineY2;
+
+                QPen greenX(QColor(0, 230, 80), 1.0);   // 竖线：亮绿
+                QPen greenY(QColor(0, 200, 60), 1.0);   // 横线：深绿 (MFC GREEN2)
+                auto mapX = [&target](double ix) { return target.left() + ix * target.width() / double(CScanWidth); };
+                auto mapY = [&target](double iy) { return target.top()  + iy * target.height() / double(WaveSampleCount); };
+
+                p.setPen(greenX);
+                p.drawLine(QPointF(mapX(x1), mapY(0)),   QPointF(mapX(x1), mapY(399)));
+                p.drawLine(QPointF(mapX(x2), mapY(0)),   QPointF(mapX(x2), mapY(399)));
+
+                p.setPen(greenY);
+                p.drawLine(QPointF(mapX(0),   mapY(y1)), QPointF(mapX(511), mapY(y1)));
+                p.drawLine(QPointF(mapX(0),   mapY(y2)), QPointF(mapX(511), mapY(y2)));
+            }
+        }
     }
 
     QFont axisFont(ThemeFont::Ui, 8);
@@ -354,4 +432,63 @@ void BScanWidget::paintEvent(QPaintEvent *)
         p.setFont(hintFont);
         p.drawText(plot, Qt::AlignCenter, QString::fromUtf8("等待数据..."));
     }
+}
+
+QRect BScanWidget::imageRect() const
+{
+    const int ml = qMin(62, qMax(48, width() / 9));
+    const int mt = qMin(38, qMax(30, height() / 10));
+    const int mr = qMin(50, qMax(22, width() / 8));
+    const int mb = qMin(18, qMax(8, height() / 20));
+    QRect plot = rect().adjusted(ml, mt, -mr, -mb);
+    if (plot.width() <= 0 || plot.height() <= 0) return {};
+
+    constexpr double imageAspect = double(CScanWidth) / WaveSampleCount;
+    const int aspectWidth = qRound(plot.height() * imageAspect);
+    if (aspectWidth < plot.width()) {
+        plot.setLeft(plot.left() + (plot.width() - aspectWidth) / 2);
+        plot.setWidth(aspectWidth);
+    } else {
+        const int aspectHeight = qRound(plot.width() / imageAspect);
+        if (aspectHeight < plot.height())
+            plot.setHeight(aspectHeight);
+    }
+
+    const QSize fitted = QSize(CScanWidth, WaveSampleCount)
+        .scaled(plot.size(), Qt::KeepAspectRatio);
+    return QRect(
+        plot.left() + (plot.width()  - fitted.width())  / 2,
+        plot.top()  + (plot.height() - fitted.height()) / 2,
+        fitted.width(), fitted.height());
+}
+
+void BScanWidget::mousePressEvent(QMouseEvent *event)
+{
+    if (m_frozen || m_ruleBeamCount < 1) {
+        QWidget::mousePressEvent(event);
+        return;
+    }
+
+    const QRect imgRect = imageRect();
+    if (!imgRect.isValid() || !imgRect.contains(event->pos())) {
+        QWidget::mousePressEvent(event);
+        return;
+    }
+
+    // 点击 X → 图像 X 坐标 → 找最近声束
+    const double imgX = (event->pos().x() - imgRect.left())
+        * double(CScanWidth) / imgRect.width();
+    int bestBeam = 0;
+    double bestDist = std::abs(m_rules[0].x - imgX);
+    for (int b = 1; b < m_ruleBeamCount; ++b) {
+        const double dist = std::abs(m_rules[b].x - imgX);
+        if (dist < bestDist) {
+            bestDist = dist;
+            bestBeam = b;
+        }
+    }
+
+    m_selectedBeam = bestBeam;
+    update();
+    emit beamSelected(bestBeam);
 }

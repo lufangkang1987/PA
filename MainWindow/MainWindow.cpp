@@ -453,8 +453,6 @@ void MainWindow::wireDriverSignals()
     // ── A/B 扫波形 → HomePage ──
     connect(m_driver, &IDriver::waveformReady,
             m_homePage, &HomePage::setAScanWaveform);
-    connect(m_driver, &IDriver::multiBeamWaveformsReady,
-            m_homePage, &HomePage::setBScanWaveforms);
     connect(m_driver, &IDriver::frameStatisticsChanged,
             m_homePage, &HomePage::updateFrameStatistics);
 
@@ -475,6 +473,8 @@ void MainWindow::wireDriverSignals()
             m_cScanEngine, &CScanEngine::processPacket);
     connect(m_driver, &IDriver::dataPacketReady,
             m_dataProcessor, &DataPacketProcessor::process);
+    connect(m_driver, &IDriver::dataPacketReady,
+            m_homePage, &HomePage::setLatestDataPacket);
 
     // ── DataPacketProcessor → 测量面板 ──
     connect(m_dataProcessor, &DataPacketProcessor::gateReadingsReady, this,

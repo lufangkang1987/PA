@@ -1,6 +1,7 @@
 #include "ParamPage.h"
 #include "ImagingParamPage.h"
 #include "ScanParamPage.h"
+#include "ReceiveParamPage.h"
 
 #include <QStackedWidget>
 
@@ -12,6 +13,10 @@ void ParamPage::buildScanPage()
         m_scanLabels[i] = m_scanPage->scanLabels[i];
         m_scanWidgets[i] = m_scanPage->scanWidgets[i];
     }
+    connect(m_scanPage, &ScanParamPage::beamGeometryChanged, this, [this] {
+        if (m_receivePage)
+            m_receivePage->updateBeamNoRange();
+    });
     m_stack->addWidget(m_scanPage);
 }
 
@@ -19,6 +24,8 @@ void ParamPage::onScanTypeChanged(int idx)
 {
     if (m_scanPage)
         m_scanPage->rebuildForScanType(idx);
+    if (m_receivePage)
+        m_receivePage->updateBeamNoRange();
 }
 
 void ParamPage::onScanButtonClicked()

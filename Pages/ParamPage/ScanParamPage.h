@@ -17,6 +17,9 @@ public:
     QLabel *scanLabels[7] = {};
     QWidget *scanWidgets[7] = {};
 
+signals:
+    void beamGeometryChanged();
+
 private:
     PAParams *m_params = nullptr;
 };

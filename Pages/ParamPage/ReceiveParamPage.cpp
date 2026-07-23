@@ -76,3 +76,31 @@ ReceiveParamPage::ReceiveParamPage(PAParams *params, ParameterDispatcher *dispat
     layout->addWidget(form);
     layout->addStretch();
 }
+
+void ReceiveParamPage::updateBeamNoRange()
+{
+    if (!m_params || !beamNoSpin) return;
+
+    int maxBeamNo = 127;  // 默认 S 扫 128 声束(0~127)
+    if (m_params->scan.scanType == 0) {
+        // S扫: MFC 对应 BeamCount=0 时 num=128，最大编号 127
+        // 实际声束数由设备决定，global.beamCount 是存储值
+        maxBeamNo = m_params->global.beamCount - 1;
+    } else if (m_params->scan.scanType == 1) {
+        // L扫: MFC EleEnd - EleStart + 1 - EleAperture (0-based max index)
+        maxBeamNo = m_params->scan.eleEnd - m_params->scan.eleStart + 1
+                    - m_params->scan.eleAperture;
+    } else {
+        // CL扫: MFC ProbeCount - 1
+        maxBeamNo = m_params->probe.probeCount - 1;
+    }
+    maxBeamNo = qBound(0, maxBeamNo, 127);
+
+    beamNoSpin->blockSignals(true);
+    beamNoSpin->setMaximum(maxBeamNo + 1);  // UI 显示 1-based
+    if (m_params->rx.curBeam > maxBeamNo) {
+        m_params->rx.curBeam = maxBeamNo;
+        beamNoSpin->setValue(maxBeamNo + 1);
+    }
+    beamNoSpin->blockSignals(false);
+}

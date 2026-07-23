@@ -79,11 +79,14 @@ void ScanParamPage::rebuildForScanType(int idx)
         }
 
         if (!wrappedField) continue;
-        if (auto *intField = wrappedField->findChild<QSpinBox *>()) {
+        auto *intField = qobject_cast<QSpinBox *>(wrappedField);
+        if (!intField) intField = wrappedField->findChild<QSpinBox *>();
+        if (intField) {
             connect(intField, QOverload<int>::of(&QSpinBox::valueChanged), this, [this, i](int value) {
                 if (i == 1) m_params->scan.eleStart = value;
                 else if (i == 2) m_params->scan.eleEnd = value;
                 else if (i == 3) m_params->scan.eleAperture = value;
+                if (i >= 1 && i <= 3) emit beamGeometryChanged();
             });
         } else if (auto *doubleField = wrappedField->findChild<QDoubleSpinBox *>()) {
             connect(doubleField, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this, idx, i](double value) {

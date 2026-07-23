@@ -13,6 +13,8 @@ class ReceiveParamPage : public QWidget
     Q_OBJECT
 public:
     explicit ReceiveParamPage(PAParams *params, ParameterDispatcher *dispatcher, QWidget *parent = nullptr);
+    void setDispatcher(ParameterDispatcher *dispatcher) { m_dispatcher = dispatcher; }
+    void updateBeamNoRange();
 
     QDoubleSpinBox *aGainSpin = nullptr;
     QDoubleSpinBox *dGainSpin = nullptr;

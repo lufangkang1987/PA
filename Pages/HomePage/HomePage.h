@@ -4,6 +4,8 @@
 #include <QResizeEvent>
 #include <QVector>
 #include <QPainter>
+#include <QTimer>
+#include <memory>
 #include "DataTypes.h"
 #include <QVector>
 struct PAParams;
@@ -63,11 +65,13 @@ class HomePage : public QWidget
 public:
 	explicit HomePage(QWidget* parent = nullptr);
 	void bindParams(const PAParams *params);
+	void refreshBScanFromParams();
 
 	// A/B 扫描数据入口（由 MainWindow 从 Driver 信号转发）
 	void setAScanWaveform(const QVector<double> &data, int beamIndex,
 	                      int frameIndex, int rectifyMode);
 	void setBScanWaveforms(const QVector<QVector<double>> &waves);
+	void setLatestDataPacket(std::shared_ptr<DataPacket> packet);
 	void setBScanRulePositions(const QVector<double> &positions);
 	void updateFrameStatistics(int frameDiff, quint64 droppedFrames);
 	void updateBeamInfo(int beamIndex, double gainDb);
@@ -117,4 +121,8 @@ private:
 	ElidedLabel* m_analysisStatus = nullptr;
 	ElidedLabel* m_frameDiffStatus = nullptr;
 	ElidedLabel* m_droppedFrameStatus = nullptr;
+	QTimer* m_bScanRenderTimer = nullptr;
+	std::shared_ptr<DataPacket> m_latestBScanPacket;
+	uint16_t m_lastRenderedBScanFrame = 0;
+	bool m_hasRenderedBScanFrame = false;
 };

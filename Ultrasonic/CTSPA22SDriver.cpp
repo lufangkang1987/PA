@@ -464,20 +464,6 @@ void CTSPA22SDriver::processFrame(const DriverFrame &frame)
         }
 
         // --- 全部声束波形（供 B 扫 softwareImaging 使用） ---
-        {
-            QVector<QVector<double>> allWaves(pkt->beamCount);
-            const bool isRF = (m_rectify == 3);
-            for (int b = 0; b < pkt->beamCount; ++b) {
-                allWaves[b].resize(WaveSampleCount);
-                for (int i = 0; i < WaveSampleCount; ++i) {
-                    if (isRF)
-                        allWaves[b][i] = (static_cast<int>(pkt->beams[b].waveP[i]) - 128) / 128.0;
-                    else
-                        allWaves[b][i] = pkt->beams[b].waveP[i] / 255.0;
-                }
-            }
-            emit multiBeamWaveformsReady(allWaves);
-        }
 
         // --- 闸门读数 ---
         {
@@ -986,13 +972,13 @@ void CTSPA22SDriver::setScanType(int type)
 void CTSPA22SDriver::setAnalogGain(float dB)
 {
     m_analogGain = dB;
-    sendJsonCommand(buildGainCommand(dB));
+    sendJsonCommand(buildGainCommand(dB), false);
 }
 
 void CTSPA22SDriver::setDigitalGain(float dB)
 {
     m_digitalGain = dB;
-    sendJsonCommand(buildDGainCommand(dB));
+    sendJsonCommand(buildDGainCommand(dB), false);
 }
 
 void CTSPA22SDriver::setTemperatureCompensation(bool enabled)

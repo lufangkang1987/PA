@@ -305,10 +305,9 @@ void CScanEngine::computeScanRules(int beamCount, ScanRule *rules)
 {
     const int count = qBound(1, beamCount, MaxBeams);
     ::computeScanRules(m_params.scan, m_params.probe, m_params.tx.range,
-                       m_params.global.beamCount,
+                       count,
                        &m_rulePositions, &m_explicitRules, rules,
                        &m_imgSpanStart, &m_imgSpanEnd);
-    Q_UNUSED(count);
 }
 
 QVector<uint8_t> CScanEngine::softwareImaging(const DataPacket &packet)
